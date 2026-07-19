@@ -186,6 +186,12 @@
       <canvas id="chart" height="220"></canvas>
       <div class="hint" id="pxnote"></div>
     </div>
+    <div class="panel chart">
+      <h2><span class="ic">₿</span> BTCUSD · M30 <span class="meta" id="bpxmeta"></span></h2>
+      <div class="ph"><span class="px" id="bpxnow">—</span><span id="bpxchg"></span></div>
+      <canvas id="chartbtc" height="220"></canvas>
+      <div class="hint" id="bpxnote"></div>
+    </div>
     <div class="cards" id="cards"></div>
   </div>
 
@@ -625,28 +631,36 @@ async function renderCtx(){
 }
 
 // ===== live price chart (candlestick) =====
-let PRICES=null;
+let PRICES=null, BPRICES=null;
 async function loadPrices(){
   try{ PRICES=await getJSON("prices.json"); }catch(e){ PRICES=null; }
-  renderChart();
+  try{ BPRICES=await getJSON("btc_prices.json"); }catch(e){ BPRICES=null; }
+  // กราฟทอง (BLADE/RIDER/HUNTER)
+  renderChart(PRICES, {cv:"chart",note:"pxnote",now:"pxnow",chg:"pxchg",meta:"pxmeta"},
+              (STATUS&&STATUS.open_positions)||[], TRADES);
+  // กราฟ BTC (ARES/KRONOS) — แปลง position ให้อยู่รูปเดียวกับของ BLADE
+  const btcOpens=[ASTATUS,KSTATUS].filter(s=>s&&s.position)
+                  .map(s=>({price_open:s.position.entry, type:s.position.direction}));
+  renderChart(BPRICES, {cv:"chartbtc",note:"bpxnote",now:"bpxnow",chg:"bpxchg",meta:"bpxmeta"},
+              btcOpens, [].concat(ATRADES||[], KTRADES||[]));
 }
-function renderChart(){
-  const cv=$("chart"); if(!cv) return;
-  const ctx=cv.getContext("2d"); const note=$("pxnote");
-  if(!PRICES||!PRICES.candles||!PRICES.candles.length){
+function renderChart(P, ids, opens, trades){
+  const cv=$(ids.cv); if(!cv) return;
+  const ctx=cv.getContext("2d"); const note=$(ids.note);
+  if(!P||!P.candles||!P.candles.length){
     ctx.clearRect(0,0,cv.width,cv.height);
-    $("pxnow").textContent="—"; $("pxchg").textContent=""; $("pxmeta").textContent="";
-    note.innerHTML="<span style='color:var(--amber)'>รอข้อมูลราคา — รีสตาร์ทบอทเพื่อเริ่มเขียน prices.json</span>";
+    $(ids.now).textContent="—"; $(ids.chg).textContent=""; $(ids.meta).textContent="";
+    note.innerHTML="<span style='color:var(--amber)'>รอข้อมูลราคา — รีสตาร์ทบอทเพื่อเริ่มเขียนไฟล์ราคา</span>";
     return;
   }
   note.textContent="";
-  const C=PRICES.candles, dpr=window.devicePixelRatio||1;
+  const C=P.candles, dpr=window.devicePixelRatio||1;
   const W=cv.clientWidth||600, H=220;
   cv.width=W*dpr; cv.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const padR=54,padT=8,padB=14,plotW=W-padR,plotH=H-padT-padB;
   let lo=Math.min(...C.map(c=>c[3])), hi=Math.max(...C.map(c=>c[2]));
   const lastC=C[C.length-1];
-  const bid=PRICES.bid!=null?PRICES.bid:lastC[4];
+  const bid=P.bid!=null?P.bid:lastC[4];
   lo=Math.min(lo,bid); hi=Math.max(hi,bid);
   const pd=(hi-lo)*0.08||1; lo-=pd; hi+=pd; const rng=hi-lo||1;
   const Y=p=>padT+(1-(p-lo)/rng)*plotH;
@@ -666,13 +680,13 @@ function renderChart(){
 
   // ===== เส้นราคาเข้าของออเดอร์ที่เปิดอยู่ =====
   const t0=C[0][0], step=(n>1?(C[1][0]-C[0][0]):300)||300;
-  if(STATUS&&STATUS.open_positions){STATUS.open_positions.forEach(function(p){
+  if(opens&&opens.length){opens.forEach(function(p){
     if(!p.price_open)return; const yo=Y(p.price_open); if(yo<padT||yo>padT+plotH)return;
     ctx.strokeStyle=p.type==="BUY"?"#39ff14":"#ff4d4d"; ctx.setLineDash([2,3]);
     ctx.beginPath(); ctx.moveTo(0,yo); ctx.lineTo(plotW,yo); ctx.stroke(); ctx.setLineDash([]);
   });}
   // ===== ลูกศรจุดออกของไม้ที่ปิดในช่วงเวลาที่เห็นบนกราฟ =====
-  (TRADES||[]).forEach(function(r){
+  (trades||[]).forEach(function(r){
     const ct=Date.parse((r.close_time||"").replace(" ","T")+"Z")/1000;
     if(!ct)return; const idx=Math.round((ct-t0)/step); if(idx<0||idx>=n)return;
     const ex=parseFloat(r.exit_price); if(!ex)return; const cx=idx*slot+slot/2, ey=Y(ex);
@@ -686,9 +700,9 @@ function renderChart(){
 
   const last=lastC[4], prev=C.length>1?C[C.length-2][4]:lastC[1];
   const chg=last-prev, pct=prev?chg/prev*100:0;
-  $("pxnow").textContent=last.toFixed(2);
-  $("pxchg").innerHTML=`<span class="${chg>=0?'pos':'neg'}">${sign(chg)} (${(pct>=0?'+':'')+pct.toFixed(2)}%)</span>`;
-  $("pxmeta").textContent=(PRICES.updated||"").slice(11,19)+" UTC";
+  $(ids.now).textContent=last.toFixed(2);
+  $(ids.chg).innerHTML=`<span class="${chg>=0?'pos':'neg'}">${sign(chg)} (${(pct>=0?'+':'')+pct.toFixed(2)}%)</span>`;
+  $(ids.meta).textContent=(P.updated||"").slice(11,19)+" UTC";
 }
 
 $("bgimg").src = DATA_BASE + "office_bg.png";
