@@ -250,6 +250,8 @@ const AGENTS = [
    jd:"บอทตัวที่ 4 — เทพสงครามสนาม BTCUSD: OB + Sweep กลับตัวบน M30 กลไกเดียวกับ HUNTER ทอง ต่างแค่ symbol + สเกล exit (×42.4) · backtest BTC 3.5 ปี PF 1.57 (OOS 1.60) กำไรทุกปี 2024-2026"},
   {key:"kronos",name:"KRONOS",img:"kronos.png",role:"BTC H1 Reversal", color:"#7ad7f0",
    jd:"บอทตัวที่ 5 — ไททันแห่งกาลเวลา: OB + Sweep บน H1 BTCUSD เกมยาวกว่า ARES ไม้ใหญ่กว่า · backtest 3.5 ปี PF 1.61 (OOS 2.28) ทนต้นทุนถึง cost40 · รันคู่ ARES เก็บข้อมูลเทียบ M30 vs H1"},
+  {key:"helios",name:"HELIOS",img:"helios.png",role:"ETH M30 Reversal", color:"#a78bfa",
+   jd:"บอทตัวที่ 7 — สุริยเทพแห่งคริปโต: OB + Sweep กลับตัวบน M30 ETHUSD กลไกเดียวกับ HUNTER/ARES ต่างแค่ symbol + สเกล exit (×2.13) · backtest 3.5 ปี PF 1.41 (OOS 1.43) @คอมจริง ~$1 · zero-spread · lot 0.1 · เทรด 24/7"},
   {key:"hermes",name:"HERMES",img:"hermes.png",role:"FX Majors M30", color:"#e8c14a",
    jd:"บอทตัวที่ 6 — เทพการค้าคุมตะกร้าค่าเงินหลัก: กลไกเดียวกับ HUNTER (OB + Sweep กลับตัว M30 ไม่กรองเทรนด์) แต่เทรด 3 คู่พร้อมกัน EURUSD/GBPUSD/USDJPY บัญชี Zero spread · exit สเกลตาม ATR ต่อคู่ · backtest 3.5 ปี PF 1.4-1.6 (ต้นทุนคอมจริง &le;1 pip/รอบ) = ตัวกระจายความเสี่ยงเสริมทอง/BTC"},
   {key:"auto",  name:"AUTO",  img:"auto.png",  role:"Autonomous Ops", color:"#32e0e0",
@@ -271,16 +273,17 @@ function allTrades(){ return [].concat(
   (HTRADES||[]).map(r=>({...r,bot:"HUNTER"})),
   (ATRADES||[]).map(r=>({...r,bot:"ARES"})),
   (KTRADES||[]).map(r=>({...r,bot:"KRONOS"})),
-  (FTRADES||[]).map(r=>({...r,bot:"HERMES"}))); }
+  (FTRADES||[]).map(r=>({...r,bot:"HERMES"})),
+  (ELTRADES||[]).map(r=>({...r,bot:"HELIOS"}))); }
 // จำนวนไม้ที่เปิดอยู่รวมทุกบอท
 function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((RSTATUS&&RSTATUS.position)?1:0)+((HSTATUS&&HSTATUS.position)?1:0)
   +((ASTATUS&&ASTATUS.position)?1:0)+((KSTATUS&&KSTATUS.position)?1:0)
-  +fxOpen(FSTATUS).length; }
+  +((ELSTATUS&&ELSTATUS.position)?1:0)+fxOpen(FSTATUS).length; }
 // floating รวม (fallback ตอนไม่มี status.json ระดับบัญชี)
 function floatAll(){ let f=0;
   if(STATUS&&STATUS.open_positions) f+=STATUS.open_positions.reduce((s,p)=>s+(+p.profit||0),0);
-  [RSTATUS,HSTATUS,ASTATUS,KSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
+  [RSTATUS,HSTATUS,ASTATUS,KSTATUS,ELSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
   f+=fxOpen(FSTATUS).reduce((s,p)=>s+(+p.profit||0),0);
   return f; }
 
@@ -301,6 +304,7 @@ async function getJSON(n){return JSON.parse(await getText(n));}
 let STATUS=null, TRADES=[], DECS=[], PLAYBOOK="", REPORT="", RSTATUS=null, RTRADES=[], HSTATUS=null, HTRADES=[];
 let ASTATUS=null, ATRADES=[], KSTATUS=null, KTRADES=[];   // ARES (BTC M30) · KRONOS (BTC H1)
 let FSTATUS=null, FTRADES=[];                            // HERMES (FX majors M30, multi-symbol)
+let ELSTATUS=null, ELTRADES=[];                          // HELIOS (ETH M30)
 let prevTrades=null, prevOpen=null, actx=null;
 
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -325,6 +329,8 @@ async function loadAll(){
   try{ KTRADES=parseCSV(await getText("hunter_btc_h1_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ KTRADES=[]; }
   try{ FSTATUS=await getJSON("fx_status.json"); }catch(e){ FSTATUS=null; }
   try{ FTRADES=parseCSV(await getText("fx_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ FTRADES=[]; }
+  try{ ELSTATUS=await getJSON("hunter_eth_status.json"); }catch(e){ ELSTATUS=null; }
+  try{ ELTRADES=parseCSV(await getText("hunter_eth_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ELTRADES=[]; }
   try{ PLAYBOOK=await getText("playbook.md"); }catch(e){ PLAYBOOK=""; }
   try{ REPORT=await getText("review_report.md"); }catch(e){ REPORT=""; }
 
@@ -416,6 +422,7 @@ function renderCards(){
     ares:  (ASTATUS&&ASTATUS.updated&&(Date.now()-new Date(ASTATUS.updated).getTime())<5*60000)?(ASTATUS.position?"on":"idle"):"off",
     kronos:(KSTATUS&&KSTATUS.updated&&(Date.now()-new Date(KSTATUS.updated).getTime())<5*60000)?(KSTATUS.position?"on":"idle"):"off",
     hermes:(FSTATUS&&FSTATUS.updated&&(Date.now()-new Date(FSTATUS.updated).getTime())<5*60000)?(fxOpen(FSTATUS).length?"on":"idle"):"off",
+    helios:(ELSTATUS&&ELSTATUS.updated&&(Date.now()-new Date(ELSTATUS.updated).getTime())<5*60000)?(ELSTATUS.position?"on":"idle"):"off",
   };
   // winrate รวมใต้การ์ด BLADE (ตัวยิงออเดอร์)
   const _tr=TRADES.length, _wn=TRADES.filter(r=>r.profit>0).length, _wr=_tr?Math.round(_wn/_tr*100):0;
@@ -443,7 +450,7 @@ function renderCards(){
   else if(FSTATUS){ _flab="รอสัญญาณ majors"; }
   const agm={ blade:"⛔ ปิดทำการ · PF 0.46", rider:_rlab, hunter:_hlab,
               ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1"),
-              hermes:_flab };
+              hermes:_flab, helios:botLab(ELSTATUS,ELTRADES,"รอสัญญาณ ETH M30") };
   const wrap=$("cards");
   const flipped={};
   [].forEach.call(wrap.querySelectorAll(".ag"),function(el,i){ if(el.classList.contains("flipped")) flipped[i]=1; });
@@ -506,22 +513,23 @@ function renderStream(){
     <span class="${cls(r.profit)}">${sign(r.profit)}</span></div>`).join("");
   $("stream").innerHTML=html||"<div class='hint'>ยังไม่มีรายการ</div>";
 
-  // ---------- ช่อง BTCUSD (ARES M30 / KRONOS H1) ----------
+  // ---------- ช่องคริปโต (ARES/KRONOS = BTCUSD · HELIOS = ETHUSD) ----------
   let bhtml="";
-  [["ARES",ASTATUS],["KRONOS",KSTATUS]].forEach(([nm,S])=>{
+  [["ARES",ASTATUS,"BTCUSD"],["KRONOS",KSTATUS,"BTCUSD"],["HELIOS",ELSTATUS,"ETHUSD"]].forEach(([nm,S,sym])=>{
     if(S&&S.position){ const p=S.position;
       bhtml+=`<div class="frow">
       <span class="tm">OPEN</span>
       <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
-      <span>BTCUSD · <b>${nm}</b> @${fmt(p.entry||p.price_open)} <span class="open">●live</span></span>
+      <span>${sym} · <b>${nm}</b> @${fmt(p.entry||p.price_open)} <span class="open">●live</span></span>
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
-  const ball=[].concat(ATRADES.map(r=>({...r,bot:"ARES"})), KTRADES.map(r=>({...r,bot:"KRONOS"})));
+  const ball=[].concat(ATRADES.map(r=>({...r,bot:"ARES",sym:"BTCUSD"})), KTRADES.map(r=>({...r,bot:"KRONOS",sym:"BTCUSD"})),
+                       ELTRADES.map(r=>({...r,bot:"HELIOS",sym:"ETHUSD"})));
   ball.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   bhtml+=ball.slice(-25).reverse().map(r=>`<div class="frow">
     <span class="tm">${(r.close_time||"").slice(5,16)}</span>
     <span class="tag ${r.direction==='BUY'?'t-buy':'t-sell'}">${r.direction||'-'}</span>
-    <span>BTCUSD · <b>${r.bot}</b> @${fmt(parseFloat(r.entry_price))}</span>
+    <span>${r.sym} · <b>${r.bot}</b> @${fmt(parseFloat(r.entry_price))}</span>
     <span class="${cls(r.profit)}">${sign(r.profit)}</span></div>`).join("");
   $("streambtc").innerHTML=bhtml||"<div class='hint'>ยังไม่มีรายการ</div>";
 }
