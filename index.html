@@ -238,7 +238,7 @@ const STALE_MIN = 3;
 const AGENTS = [
   {key:"hawk",  name:"HAWK",  img:"hawk.png",  role:"Market Analyst", color:"#39ff14",
    jd:"นักวิเคราะห์ตลาด — เสนอสัญญาณเข้าเทรด อ่านเทรนด์/โครงสร้างราคา/โมเมนตัม + บริบท CME &amp; ข่าว แล้วเสนอ BUY/SELL พร้อมระดับความมั่นใจให้ทีมตัดสิน"},
-  {key:"blade", name:"BLADE", img:"blade.png", role:"Trade Executor", color:"#ff6b6b",
+  {key:"blade", name:"BLADE", img:"blade.png", role:"Trade Executor", color:"#ff6b6b", retired:true,
    jd:"มือวางออเดอร์ — ยิง/ปิดออเดอร์จริงบน MT5 คุม SL/TP/trailing และปิดก่อนจบแท่ง (hybrid) ตามคำสั่งที่ผ่านการอนุมัติเท่านั้น"},
   {key:"sage",  name:"SAGE",  img:"sage.png",  role:"Risk Manager", color:"#b06bff",
    jd:"ฝ่ายความเสี่ยง — มีสิทธิ์ VETO ไม้ที่เสี่ยง คุม equity guard, ลิมิตขาดทุนรายวัน, เลี่ยงช่วงข่าวแรง และตัดไม้ที่ R:R ไม่คุ้ม"},
@@ -264,6 +264,25 @@ const lastOf=a=>a&&a.length?a[a.length-1]:null;
 // HERMES เป็น multi-symbol: status มี .positions{SYM:{...}|null} — คืน list ไม้ที่เปิดอยู่
 function fxOpen(S){ if(!S||!S.positions)return[]; return Object.keys(S.positions)
   .filter(k=>S.positions[k]).map(k=>({symbol:k,...S.positions[k]})); }
+// รวมไม้ปิดของทุกบอท (BLADE+RIDER+HUNTER+ARES+KRONOS+HERMES) — ใช้ในช่อง ACCOUNT METRICS + กราฟ
+function allTrades(){ return [].concat(
+  (TRADES||[]).map(r=>({...r,bot:"BLADE"})),
+  (RTRADES||[]).map(r=>({...r,bot:"RIDER"})),
+  (HTRADES||[]).map(r=>({...r,bot:"HUNTER"})),
+  (ATRADES||[]).map(r=>({...r,bot:"ARES"})),
+  (KTRADES||[]).map(r=>({...r,bot:"KRONOS"})),
+  (FTRADES||[]).map(r=>({...r,bot:"HERMES"}))); }
+// จำนวนไม้ที่เปิดอยู่รวมทุกบอท
+function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
+  +((RSTATUS&&RSTATUS.position)?1:0)+((HSTATUS&&HSTATUS.position)?1:0)
+  +((ASTATUS&&ASTATUS.position)?1:0)+((KSTATUS&&KSTATUS.position)?1:0)
+  +fxOpen(FSTATUS).length; }
+// floating รวม (fallback ตอนไม่มี status.json ระดับบัญชี)
+function floatAll(){ let f=0;
+  if(STATUS&&STATUS.open_positions) f+=STATUS.open_positions.reduce((s,p)=>s+(+p.profit||0),0);
+  [RSTATUS,HSTATUS,ASTATUS,KSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
+  f+=fxOpen(FSTATUS).reduce((s,p)=>s+(+p.profit||0),0);
+  return f; }
 
 function parseCSV(text){
   const rows=[];let row=[],f="",q=false;
@@ -341,24 +360,27 @@ function renderLive(){
 }
 
 function renderMetrics(){
-  const closedNet=TRADES.reduce((s,r)=>s+r.profit,0);
+  // ===== รวมทุกบอท (BLADE+RIDER+HUNTER+ARES+KRONOS+HERMES) =====
+  const AT=allTrades();
+  const closedNet=AT.reduce((s,r)=>s+r.profit,0);
+  // Balance/Equity/Floating = ระดับบัญชี (ทุกบอทบัญชีเดียวกัน = รวมอยู่แล้วจาก account_info)
   const bal = STATUS&&STATUS.balance!=null ? STATUS.balance : (START_BALANCE+closedNet);
   const eq  = STATUS&&STATUS.equity!=null  ? STATUS.equity  : bal;
-  const flo = STATUS&&STATUS.floating!=null? STATUS.floating: null;
-  const opn = STATUS&&STATUS.open_count!=null? STATUS.open_count : null;
-  const wins=TRADES.filter(r=>r.profit>0).length, wr=TRADES.length?wins/TRADES.length*100:0;
-  let today;
-  if(STATUS&&STATUS.pnl_today!=null) today=STATUS.pnl_today;
-  else{ const lt=lastOf(TRADES); const d=((lt&&lt.close_time)||"").slice(0,10); today=TRADES.filter(r=>(r.close_time||"").startsWith(d)).reduce((s,r)=>s+r.profit,0); }
+  let flo = STATUS&&STATUS.floating!=null? STATUS.floating : floatAll();
+  const opn = openCountAll();
+  const wins=AT.filter(r=>r.profit>0).length, wr=AT.length?wins/AT.length*100:0;
+  // กำไรวันนี้ = ไม้ปิดของทุกบอทในวันล่าสุด
+  const dmax=AT.reduce((m,r)=>{const d=(r.close_time||"").slice(0,10);return d>m?d:m;},"");
+  const today=AT.filter(r=>(r.close_time||"").startsWith(dmax)).reduce((s,r)=>s+r.profit,0);
 
   const M=[
     ["💰","Balance",`${fmt(bal)}`,""],
     ["⚖️","Equity",`${fmt(eq)}`,""],
-    ["📉","Floating P/L", flo==null?"—":`<span class="${cls(flo)}">${sign(flo)}</span>`,""],
-    ["📦","Open Positions", opn==null?"—":`${opn}`,""],
-    ["🎯","Win Rate",`${fmt(wr,1)}%`,`<span class="mk">${wins}/${TRADES.length}</span>`],
+    ["📉","Floating P/L", flo==null?"—":`<span class="${cls(flo)}">${sign(flo)}</span>`,`<span class="mk">ทุกบอท</span>`],
+    ["📦","Open Positions",`${opn}`,`<span class="mk">ทุกบอท</span>`],
+    ["🎯","Win Rate",`${fmt(wr,1)}%`,`<span class="mk">${wins}/${AT.length}</span>`],
     ["💵","กำไรวันนี้",`<span class="${cls(today)}">${sign(today)}</span>`,""],
-    ["📈","กำไรสะสม (ปิดแล้ว)",`<span class="${cls(closedNet)}">${sign(closedNet)}</span>`,`<span class="mk">${TRADES.length} ไม้</span>`],
+    ["📈","กำไรสะสม (ปิดแล้ว)",`<span class="${cls(closedNet)}">${sign(closedNet)}</span>`,`<span class="mk">${AT.length} ไม้ · ทุกบอท</span>`],
   ];
   $("metrics").innerHTML=M.map(([i,k,v,x])=>`<div class="metric"><div class="mi">${i}</div>
     <div style="flex:1"><div class="mk">${k}</div><div class="mv">${v}</div></div>${x?`<div>${x}</div>`:""}</div>`).join("");
@@ -368,8 +390,8 @@ function renderMetrics(){
 }
 
 function renderSpark(){
-  const svg=$("spark"); if(!TRADES.length){svg.innerHTML="";return;}
-  let c=0; const pts=TRADES.map(r=>(c+=r.profit));
+  const svg=$("spark"); const ST=allTrades().slice().sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||"")); if(!ST.length){svg.innerHTML="";return;}
+  let c=0; const pts=ST.map(r=>(c+=r.profit));
   const mn=Math.min(0,...pts), mx=Math.max(0,...pts), rng=(mx-mn)||1;
   const X=i=>i/(pts.length-1||1)*240, Y=v=>38-((v-mn)/rng)*36;
   const d=pts.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
@@ -386,7 +408,7 @@ function renderCards(){
   const hawkOn = (!STATUS || STATUS.ai_panel!==false) && lastDec!=null && lastDec<90;
   const st={
     hawk:  hawkOn?"on":(live?"idle":"off"),
-    blade: live?"on":"off",
+    blade: "off",   // ปิดทำการ (retired — เทสตก PF 0.46)
     sage:  live?"on":"off",
     auto:  live&&STATUS&&STATUS.dry_run===false?"on":(live?"idle":"off"),
     rider: (RSTATUS&&RSTATUS.updated&&(Date.now()-new Date(RSTATUS.updated).getTime())<5*60000)?(RSTATUS.position?"on":"idle"):"off",
@@ -419,13 +441,13 @@ function renderCards(){
   if(_fop.length){ const fp=_fop.reduce((s,p)=>s+(+p.profit||0),0); _flab="ถือ "+_fop.length+"/3 · "+(fp>=0?"+":"")+fp.toFixed(2); }
   else if(FTRADES.length){ const fn=FTRADES.reduce((s,r)=>s+r.profit,0); _flab=FTRADES.length+" ไม้ · NET "+(fn>=0?"+":"")+fn.toFixed(2); }
   else if(FSTATUS){ _flab="รอสัญญาณ majors"; }
-  const agm={ blade:_tr?("winrate "+_wr+"% · "+_tr+" ไม้"):"", rider:_rlab, hunter:_hlab,
+  const agm={ blade:"⛔ ปิดทำการ · PF 0.46", rider:_rlab, hunter:_hlab,
               ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1"),
               hermes:_flab };
   const wrap=$("cards");
   const flipped={};
   [].forEach.call(wrap.querySelectorAll(".ag"),function(el,i){ if(el.classList.contains("flipped")) flipped[i]=1; });
-  wrap.innerHTML=AGENTS.map(a=>`<div class="ag" data-k="${a.key}" onclick="this.classList.toggle('flipped')">
+  wrap.innerHTML=AGENTS.map(a=>`<div class="ag" data-k="${a.key}" style="${a.retired?'opacity:.5;filter:grayscale(.85)':''}" onclick="this.classList.toggle('flipped')">
     <div class="ag-inner">
       <div class="ag-face">
         <span class="st st-${st[a.key]}"></span>
