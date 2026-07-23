@@ -250,6 +250,8 @@ const AGENTS = [
    jd:"บอทตัวที่ 4 — เทพสงครามสนาม BTCUSD: OB + Sweep กลับตัวบน M30 กลไกเดียวกับ HUNTER ทอง ต่างแค่ symbol + สเกล exit (×42.4) · backtest BTC 3.5 ปี PF 1.57 (OOS 1.60) กำไรทุกปี 2024-2026"},
   {key:"kronos",name:"KRONOS",img:"kronos.png",role:"BTC H1 Reversal", color:"#7ad7f0",
    jd:"บอทตัวที่ 5 — ไททันแห่งกาลเวลา: OB + Sweep บน H1 BTCUSD เกมยาวกว่า ARES ไม้ใหญ่กว่า · backtest 3.5 ปี PF 1.61 (OOS 2.28) ทนต้นทุนถึง cost40 · รันคู่ ARES เก็บข้อมูลเทียบ M30 vs H1"},
+  {key:"hermes",name:"HERMES",img:"hermes.png",role:"FX Majors M30", color:"#e8c14a",
+   jd:"บอทตัวที่ 6 — เทพการค้าคุมตะกร้าค่าเงินหลัก: กลไกเดียวกับ HUNTER (OB + Sweep กลับตัว M30 ไม่กรองเทรนด์) แต่เทรด 3 คู่พร้อมกัน EURUSD/GBPUSD/USDJPY บัญชี Zero spread · exit สเกลตาม ATR ต่อคู่ · backtest 3.5 ปี PF 1.4-1.6 (ต้นทุนคอมจริง &le;1 pip/รอบ) = ตัวกระจายความเสี่ยงเสริมทอง/BTC"},
   {key:"auto",  name:"AUTO",  img:"auto.png",  role:"Autonomous Ops", color:"#32e0e0",
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
 ];
@@ -259,6 +261,9 @@ const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
 const sign=n=>(n>0?"+":"")+fmt(n);
 const lastOf=a=>a&&a.length?a[a.length-1]:null;
+// HERMES เป็น multi-symbol: status มี .positions{SYM:{...}|null} — คืน list ไม้ที่เปิดอยู่
+function fxOpen(S){ if(!S||!S.positions)return[]; return Object.keys(S.positions)
+  .filter(k=>S.positions[k]).map(k=>({symbol:k,...S.positions[k]})); }
 
 function parseCSV(text){
   const rows=[];let row=[],f="",q=false;
@@ -276,6 +281,7 @@ async function getJSON(n){return JSON.parse(await getText(n));}
 
 let STATUS=null, TRADES=[], DECS=[], PLAYBOOK="", REPORT="", RSTATUS=null, RTRADES=[], HSTATUS=null, HTRADES=[];
 let ASTATUS=null, ATRADES=[], KSTATUS=null, KTRADES=[];   // ARES (BTC M30) · KRONOS (BTC H1)
+let FSTATUS=null, FTRADES=[];                            // HERMES (FX majors M30, multi-symbol)
 let prevTrades=null, prevOpen=null, actx=null;
 
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -298,6 +304,8 @@ async function loadAll(){
   try{ ATRADES=parseCSV(await getText("hunter_btc_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ATRADES=[]; }
   try{ KSTATUS=await getJSON("hunter_btc_h1_status.json"); }catch(e){ KSTATUS=null; }
   try{ KTRADES=parseCSV(await getText("hunter_btc_h1_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ KTRADES=[]; }
+  try{ FSTATUS=await getJSON("fx_status.json"); }catch(e){ FSTATUS=null; }
+  try{ FTRADES=parseCSV(await getText("fx_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ FTRADES=[]; }
   try{ PLAYBOOK=await getText("playbook.md"); }catch(e){ PLAYBOOK=""; }
   try{ REPORT=await getText("review_report.md"); }catch(e){ REPORT=""; }
 
@@ -385,6 +393,7 @@ function renderCards(){
     hunter:(HSTATUS&&HSTATUS.updated&&(Date.now()-new Date(HSTATUS.updated).getTime())<5*60000)?(HSTATUS.position?"on":"idle"):"off",
     ares:  (ASTATUS&&ASTATUS.updated&&(Date.now()-new Date(ASTATUS.updated).getTime())<5*60000)?(ASTATUS.position?"on":"idle"):"off",
     kronos:(KSTATUS&&KSTATUS.updated&&(Date.now()-new Date(KSTATUS.updated).getTime())<5*60000)?(KSTATUS.position?"on":"idle"):"off",
+    hermes:(FSTATUS&&FSTATUS.updated&&(Date.now()-new Date(FSTATUS.updated).getTime())<5*60000)?(fxOpen(FSTATUS).length?"on":"idle"):"off",
   };
   // winrate รวมใต้การ์ด BLADE (ตัวยิงออเดอร์)
   const _tr=TRADES.length, _wn=TRADES.filter(r=>r.profit>0).length, _wr=_tr?Math.round(_wn/_tr*100):0;
@@ -404,8 +413,15 @@ function renderCards(){
     if(T&&T.length){ const n=T.reduce((s,r)=>s+r.profit,0); return T.length+" ไม้ · NET "+(n>=0?"+":"")+n.toFixed(2); }
     return S?wait:"";
   };
+  // ป้ายใต้การ์ด HERMES (multi-symbol: รวม float ไม้ที่เปิด / สถิติสะสม / รอสัญญาณ)
+  let _flab="";
+  const _fop=fxOpen(FSTATUS);
+  if(_fop.length){ const fp=_fop.reduce((s,p)=>s+(+p.profit||0),0); _flab="ถือ "+_fop.length+"/3 · "+(fp>=0?"+":"")+fp.toFixed(2); }
+  else if(FTRADES.length){ const fn=FTRADES.reduce((s,r)=>s+r.profit,0); _flab=FTRADES.length+" ไม้ · NET "+(fn>=0?"+":"")+fn.toFixed(2); }
+  else if(FSTATUS){ _flab="รอสัญญาณ majors"; }
   const agm={ blade:_tr?("winrate "+_wr+"% · "+_tr+" ไม้"):"", rider:_rlab, hunter:_hlab,
-              ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1") };
+              ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1"),
+              hermes:_flab };
   const wrap=$("cards");
   const flipped={};
   [].forEach.call(wrap.querySelectorAll(".ag"),function(el,i){ if(el.classList.contains("flipped")) flipped[i]=1; });
@@ -445,17 +461,26 @@ function renderStream(){
       <span>XAUUSD · <b>${nm}</b> @${fmt(p.entry||p.price_open)} <span class="open">●live</span></span>
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
-  // รวมไม้ปิดทุกบอท เรียงเวลา + โชว์ราคาเข้า
+  // ไม้ค้างของ HERMES (multi-symbol FX)
+  fxOpen(FSTATUS).forEach(p=>{
+    html+=`<div class="frow">
+      <span class="tm">OPEN</span>
+      <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
+      <span>${esc(p.symbol)} · <b>HERMES</b> @${fmt(p.entry)} <span class="open">●live</span></span>
+      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`;
+  });
+  // รวมไม้ปิดทุกบอท เรียงเวลา + โชว์ราคาเข้า (HERMES พก symbol ต่อไม้)
   const all=[].concat(
     TRADES.map(r=>({...r,bot:"BLADE"})),
     RTRADES.map(r=>({...r,bot:"RIDER"})),
-    HTRADES.map(r=>({...r,bot:"HUNTER"})));
+    HTRADES.map(r=>({...r,bot:"HUNTER"})),
+    FTRADES.map(r=>({...r,bot:"HERMES"})));
   all.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   const recent=all.slice(-25).reverse();
   html+=recent.map(r=>`<div class="frow">
     <span class="tm">${(r.close_time||"").slice(5,16)}</span>
     <span class="tag ${r.direction==='BUY'?'t-buy':'t-sell'}">${r.direction||'-'}</span>
-    <span>XAUUSD · <b>${r.bot}</b> @${fmt(parseFloat(r.entry_price))}</span>
+    <span>${esc(r.symbol||'XAUUSD')} · <b>${r.bot}</b> @${fmt(parseFloat(r.entry_price))}</span>
     <span class="${cls(r.profit)}">${sign(r.profit)}</span></div>`).join("");
   $("stream").innerHTML=html||"<div class='hint'>ยังไม่มีรายการ</div>";
 
