@@ -256,6 +256,14 @@ const AGENTS = [
    jd:"บอทตัวที่ 7 — สุริยเทพแห่งคริปโต: OB + Sweep กลับตัวบน M30 ETHUSD กลไกเดียวกับ HUNTER/ARES ต่างแค่ symbol + สเกล exit (×2.13) · backtest 3.5 ปี PF 1.41 (OOS 1.43) @คอมจริง ~$1 · zero-spread · lot 0.1 · เทรด 24/7"},
   {key:"hermes",name:"HERMES",img:"hermes.png",role:"FX Majors M30", color:"#e8c14a",
    jd:"บอทตัวที่ 6 — เทพการค้าคุมตะกร้าค่าเงินหลัก: กลไกเดียวกับ HUNTER (OB + Sweep กลับตัว M30 ไม่กรองเทรนด์) แต่เทรด 3 คู่พร้อมกัน EURUSD/GBPUSD/USDJPY บัญชี Zero spread · exit สเกลตาม ATR ต่อคู่ · backtest 3.5 ปี PF 1.4-1.6 (ต้นทุนคอมจริง &le;1 pip/รอบ) = ตัวกระจายความเสี่ยงเสริมทอง/BTC"},
+  {key:"xauh1", name:"HUNTER-H1", img:"hunter_xau_h1.png", role:"XAU H1 Reversal", color:"#f0b429",
+   jd:"บอทตัวที่ 9 — HUNTER สายทองเกมยาว: OB + Sweep กลับตัวบน H1 ทองคำ กลไกเดียวกับ HUNTER M30 ต่างแค่ TF + สเกล exit (&times;1.45) · backtest 2.5 ปี ต้นทุนจริง PF 2.00 (IS 1.71/OOS 2.68) · ไม้ใหญ่กว่า M30 SL สูงสุด $46"},
+  {key:"xauh4", name:"HUNTER-H4", img:"hunter_xau_h4.png", role:"XAU H4 Reversal", color:"#c98f00",
+   jd:"บอทตัวที่ 10 — HUNTER สายทองภาพใหญ่: OB + Sweep บน H4 ทองคำ ~15 ไม้/เดือน ไม้ใหญ่สุดในทีม · backtest ต้นทุนจริง PF 1.79 (IS 2.04/OOS 1.48) · &#9888; SL สูงสุด $90/ไม้ = ตัวเสี่ยงสุดต่อไม้"},
+  {key:"ridergj", name:"RIDER-GJ", img:"rider_gbpjpy.png", role:"GBPJPY Trend", color:"#ff8fa3",
+   jd:"บอทตัวที่ 11 — RIDER สายเงินเยน: Donchian48 breakout + trail 4&times;ATR + BE บน GBPJPY M30 กลไกเดียวกับ RIDER ทอง · backtest 3.5 ปี PF 1.55 โดย IS = OOS = 1.55 (เสถียรผิดปกติ = สัญญาณดี)"},
+  {key:"zeuseth", name:"ZEUS-ETH", img:"w3_eth.png", role:"W3 Squeeze ETH", color:"#8b5cf6",
+   jd:"บอทตัวที่ 12 — สายฟ้าคริปโต: W3 Squeeze breakout บน ETHUSD M30 กลไกเดียวกับ ZEUS ทอง · backtest 3.5 ปี ต้นทุนจริง PF 2.91 WR 92% (IS 2.93/OOS 2.72) ดีกว่า HUNTER บน ETH ที่ HELIOS ใช้ (1.61) · รันคู่ HELIOS"},
   {key:"auto",  name:"AUTO",  img:"auto.png",  role:"Autonomous Ops", color:"#32e0e0",
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
 ];
@@ -277,16 +285,22 @@ function allTrades(){ return [].concat(
   (KTRADES||[]).map(r=>({...r,bot:"KRONOS"})),
   (FTRADES||[]).map(r=>({...r,bot:"HERMES"})),
   (ELTRADES||[]).map(r=>({...r,bot:"HELIOS"})),
-  (ZTRADES||[]).map(r=>({...r,bot:"ZEUS"}))); }
+  (ZTRADES||[]).map(r=>({...r,bot:"ZEUS"})),
+  (X1TRADES||[]).map(r=>({...r,bot:"HUNTER-H1"})),
+  (X4TRADES||[]).map(r=>({...r,bot:"HUNTER-H4"})),
+  (GJTRADES||[]).map(r=>({...r,bot:"RIDER-GJ"})),
+  (ZETRADES||[]).map(r=>({...r,bot:"ZEUS-ETH"}))); }
 // จำนวนไม้ที่เปิดอยู่รวมทุกบอท
 function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((RSTATUS&&RSTATUS.position)?1:0)+((HSTATUS&&HSTATUS.position)?1:0)
   +((ASTATUS&&ASTATUS.position)?1:0)+((KSTATUS&&KSTATUS.position)?1:0)
-  +((ELSTATUS&&ELSTATUS.position)?1:0)+((ZSTATUS&&ZSTATUS.position)?1:0)+fxOpen(FSTATUS).length; }
+  +((ELSTATUS&&ELSTATUS.position)?1:0)+((ZSTATUS&&ZSTATUS.position)?1:0)
+  +((X1STATUS&&X1STATUS.position)?1:0)+((X4STATUS&&X4STATUS.position)?1:0)
+  +((GJSTATUS&&GJSTATUS.position)?1:0)+((ZESTATUS&&ZESTATUS.position)?1:0)+fxOpen(FSTATUS).length; }
 // floating รวม (fallback ตอนไม่มี status.json ระดับบัญชี)
 function floatAll(){ let f=0;
   if(STATUS&&STATUS.open_positions) f+=STATUS.open_positions.reduce((s,p)=>s+(+p.profit||0),0);
-  [RSTATUS,HSTATUS,ASTATUS,KSTATUS,ELSTATUS,ZSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
+  [RSTATUS,HSTATUS,ASTATUS,KSTATUS,ELSTATUS,ZSTATUS,X1STATUS,X4STATUS,GJSTATUS,ZESTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
   f+=fxOpen(FSTATUS).reduce((s,p)=>s+(+p.profit||0),0);
   return f; }
 
@@ -309,6 +323,8 @@ let ASTATUS=null, ATRADES=[], KSTATUS=null, KTRADES=[];   // ARES (BTC M30) · K
 let FSTATUS=null, FTRADES=[];                            // HERMES (FX majors M30, multi-symbol)
 let ELSTATUS=null, ELTRADES=[];                          // HELIOS (ETH M30)
 let ZSTATUS=null, ZTRADES=[];                            // ZEUS (W3 Squeeze XAU)
+let X1STATUS=null, X1TRADES=[], X4STATUS=null, X4TRADES=[];   // HUNTER-XAU-H1 / H4
+let GJSTATUS=null, GJTRADES=[], ZESTATUS=null, ZETRADES=[];   // RIDER-GJ (GBPJPY) · ZEUS-ETH
 let prevTrades=null, prevOpen=null, actx=null;
 
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -331,6 +347,14 @@ async function loadAll(){
   try{ ATRADES=parseCSV(await getText("hunter_btc_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ATRADES=[]; }
   try{ KSTATUS=await getJSON("hunter_btc_h1_status.json"); }catch(e){ KSTATUS=null; }
   try{ KTRADES=parseCSV(await getText("hunter_btc_h1_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ KTRADES=[]; }
+  try{ X1STATUS=await getJSON("hunter_xau_h1_status.json"); }catch(e){ X1STATUS=null; }
+  try{ X1TRADES=parseCSV(await getText("hunter_xau_h1_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ X1TRADES=[]; }
+  try{ X4STATUS=await getJSON("hunter_xau_h4_status.json"); }catch(e){ X4STATUS=null; }
+  try{ X4TRADES=parseCSV(await getText("hunter_xau_h4_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ X4TRADES=[]; }
+  try{ GJSTATUS=await getJSON("rider_gbpjpy_status.json"); }catch(e){ GJSTATUS=null; }
+  try{ GJTRADES=parseCSV(await getText("rider_gbpjpy_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ GJTRADES=[]; }
+  try{ ZESTATUS=await getJSON("w3_eth_status.json"); }catch(e){ ZESTATUS=null; }
+  try{ ZETRADES=parseCSV(await getText("w3_eth_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ZETRADES=[]; }
   try{ FSTATUS=await getJSON("fx_status.json"); }catch(e){ FSTATUS=null; }
   try{ FTRADES=parseCSV(await getText("fx_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ FTRADES=[]; }
   try{ ELSTATUS=await getJSON("hunter_eth_status.json"); }catch(e){ ELSTATUS=null; }
@@ -430,6 +454,10 @@ function renderCards(){
     hermes:(FSTATUS&&FSTATUS.updated&&(Date.now()-new Date(FSTATUS.updated).getTime())<5*60000)?(fxOpen(FSTATUS).length?"on":"idle"):"off",
     helios:(ELSTATUS&&ELSTATUS.updated&&(Date.now()-new Date(ELSTATUS.updated).getTime())<5*60000)?(ELSTATUS.position?"on":"idle"):"off",
     zeus:(ZSTATUS&&ZSTATUS.updated&&(Date.now()-new Date(ZSTATUS.updated).getTime())<5*60000)?(ZSTATUS.position?"on":"idle"):"off",
+    xauh1:(X1STATUS&&X1STATUS.updated&&(Date.now()-new Date(X1STATUS.updated).getTime())<5*60000)?(X1STATUS.position?"on":"idle"):"off",
+    xauh4:(X4STATUS&&X4STATUS.updated&&(Date.now()-new Date(X4STATUS.updated).getTime())<5*60000)?(X4STATUS.position?"on":"idle"):"off",
+    ridergj:(GJSTATUS&&GJSTATUS.updated&&(Date.now()-new Date(GJSTATUS.updated).getTime())<5*60000)?(GJSTATUS.position?"on":"idle"):"off",
+    zeuseth:(ZESTATUS&&ZESTATUS.updated&&(Date.now()-new Date(ZESTATUS.updated).getTime())<5*60000)?(ZESTATUS.position?"on":"idle"):"off",
   };
   // winrate รวมใต้การ์ด BLADE (ตัวยิงออเดอร์)
   const _tr=TRADES.length, _wn=TRADES.filter(r=>r.profit>0).length, _wr=_tr?Math.round(_wn/_tr*100):0;
@@ -458,7 +486,11 @@ function renderCards(){
   const agm={ blade:"⛔ ปิดทำการ · PF 0.46", rider:_rlab, hunter:_hlab,
               ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1"),
               hermes:_flab, helios:botLab(ELSTATUS,ELTRADES,"รอสัญญาณ ETH M30"),
-              zeus:botLab(ZSTATUS,ZTRADES,"รอ squeeze breakout") };
+              zeus:botLab(ZSTATUS,ZTRADES,"รอ squeeze breakout"),
+              xauh1:botLab(X1STATUS,X1TRADES,"รอสัญญาณ ทอง H1"),
+              xauh4:botLab(X4STATUS,X4TRADES,"รอสัญญาณ ทอง H4"),
+              ridergj:botLab(GJSTATUS,GJTRADES,"รอ breakout GBPJPY"),
+              zeuseth:botLab(ZESTATUS,ZETRADES,"รอ squeeze ETH") };
   const wrap=$("cards");
   const flipped={};
   [].forEach.call(wrap.querySelectorAll(".ag"),function(el,i){ if(el.classList.contains("flipped")) flipped[i]=1; });
