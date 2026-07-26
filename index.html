@@ -245,9 +245,9 @@ const ONSUPA = /supabase/i.test(location.host);
 const LOCAL  = location.protocol === "file:" || /^(localhost|127\.|192\.168\.|10\.|172\.)/.test(location.hostname);
 const DATA_BASE = (ONSUPA || LOCAL) ? "" : SUPA;    // โฮสต์อื่น ดึงตรงจาก Supabase public URL (เลิกพึ่ง proxy /d/ ของ Netlify)
 const CLOUD = !LOCAL;
-const REFRESH_SEC = CLOUD ? 60 : 10;
+const REFRESH_SEC = CLOUD ? 90 : 10;
 const PRICE_SEC   = CLOUD ? 15 : 1;
-const START_BALANCE = 943.73;
+const START_BALANCE = 5018.46;   // อัปเดต 26 ก.ค. (เติมเงิน demo) — ใช้เป็น fallback ตอน status.json โหลดไม่ได้
 const STALE_MIN = 3;
 
 const AGENTS = [
@@ -354,7 +354,9 @@ document.addEventListener("click", function(){ if(actx&&actx.state==="suspended"
 async function loadAll(){
   try{ STATUS=await getJSON("status.json"); }catch(e){ STATUS=null; }
   try{ TRADES=parseCSV(await getText("trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ TRADES=[]; }
-  try{ DECS=parseCSV(await getText("decisions.csv")); }catch(e){ DECS=[]; }
+  // decisions.csv (303 KB) = ของ HAWK ที่ปิดตั้งแต่ 3 ก.ค. ไฟล์ไม่โตอีก -> ดึงครั้งเดียวตอนเปิดหน้า
+  // (เดิมดึงทุก 60 วิ = 91% ของ egress ทั้งหมด → 13.8 GB/เดือน ถ้าเปิดแท็บทิ้ง เกินลิมิต free 5 GB)
+  if(!DECS.length){ try{ DECS=parseCSV(await getText("decisions.csv")); }catch(e){ DECS=[]; } }
   try{ RSTATUS=await getJSON("rider_status.json"); }catch(e){ RSTATUS=null; }
   try{ RTRADES=parseCSV(await getText("trend_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ RTRADES=[]; }
   try{ HSTATUS=await getJSON("hunter_status.json"); }catch(e){ HSTATUS=null; }
@@ -388,7 +390,7 @@ async function loadAll(){
   renderDaily(); renderBotStats(); renderPlaybook(); renderEnv(); renderReport();
   await renderCtx();
   $("clock").textContent=new Date().toLocaleTimeString("th-TH");
-  $("foot").textContent="AI Agent Trader · XAUUSDm M5 · รีเฟรชทุก "+REFRESH_SEC+" วิ · เทรดมีความเสี่ยง (DEMO)";
+  $("foot").textContent="AI Agent Trader · 11 บอท · รีเฟรชทุก "+REFRESH_SEC+" วิ · เทรดมีความเสี่ยง (DEMO)";
 }
 
 // อัปเดตเฉพาะ Account metrics จาก status.json (ไฟล์เล็ก ~250 ไบต์) — เรียกถี่ได้โดยไม่เปลือง bandwidth
