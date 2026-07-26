@@ -182,7 +182,7 @@
     <div class="scene">
       <img id="bgimg" alt="trading floor">
       <div class="tint" id="tint"></div>
-      <div class="ov"><div class="t">CLUB EXCHANGE · 11 BOTS LIVE</div><div class="s" id="scenesub">XAUUSD · BTC · ETH · FX majors</div></div>
+      <div class="ov"><div class="t" id="scenetitle">CLUB EXCHANGE · 12 BOTS LIVE</div><div class="s" id="scenesub">XAUUSD · BTC · ETH · FX majors</div></div>
       <div class="ticker"><span id="tick">loading…</span></div>
     </div>
     <div class="panel chart">
@@ -285,6 +285,7 @@ const AGENTS = [
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
 ];
 
+const LIVE_BOTS=12;   // จำนวนบอทที่รัน (ไม่รวม BLADE ที่ปิดแล้ว) — แก้ที่นี่ที่เดียว
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
@@ -397,7 +398,8 @@ async function loadAll(){
   renderDaily(); renderBotStats(); renderPlaybook(); renderEnv(); renderReport();
   await renderCtx();
   $("clock").textContent=new Date().toLocaleTimeString("th-TH");
-  $("foot").textContent="AI Agent Trader · 11 บอท · รีเฟรชทุก "+REFRESH_SEC+" วิ · เทรดมีความเสี่ยง (DEMO)";
+  $("foot").textContent="AI Agent Trader · "+LIVE_BOTS+" บอท · รีเฟรชทุก "+REFRESH_SEC+" วิ · เทรดมีความเสี่ยง (DEMO)";
+  { const _st=$("scenetitle"); if(_st) _st.textContent="CLUB EXCHANGE · "+LIVE_BOTS+" BOTS LIVE"; }
 }
 
 // อัปเดตเฉพาะ Account metrics จาก status.json (ไฟล์เล็ก ~250 ไบต์) — เรียกถี่ได้โดยไม่เปลือง bandwidth
@@ -557,7 +559,7 @@ function renderStream(){
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
   // ไม้ค้างของ HERMES (multi-symbol FX)
-  // ไม้ที่ถืออยู่ของบอททอง 5 ตัว
+  // ไม้ที่ถืออยู่ของบอททอง 6 ตัว
   [["RIDER",RSTATUS],["HUNTER",HSTATUS],["ZEUS",ZSTATUS],["HUNTER-H1",X1STATUS],["HUNTER-H4",X4STATUS],["ATHENA",ATHSTATUS]].forEach(([nm,S])=>{
     if(S&&S.position){ const p=S.position;
       html+=`<div class="frow">
@@ -818,7 +820,7 @@ async function renderCtx(){
 
   const _AT=allTrades();
   const net=_AT.reduce((s,r)=>s+r.profit,0);
-  $("tick").textContent=`  ทั้งพอร์ต (11 บอท)   NET ${sign(net)} USD    TRADES ${_AT.length}    WINRATE ${_AT.length?fmt(_AT.filter(r=>r.profit>0).length/_AT.length*100,1):0}%    ${botLive()?"● BOT LIVE":"○ BOT OFFLINE"}    `.repeat(3);
+  $("tick").textContent=`  ทั้งพอร์ต (${LIVE_BOTS} บอท)   NET ${sign(net)} USD    TRADES ${_AT.length}    WINRATE ${_AT.length?fmt(_AT.filter(r=>r.profit>0).length/_AT.length*100,1):0}%    ${botLive()?"● BOT LIVE":"○ BOT OFFLINE"}    `.repeat(3);
 }
 
 // ===== live price chart (candlestick) =====
