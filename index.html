@@ -123,6 +123,11 @@
     font-size:11px;padding:0 6px;border-radius:8px;opacity:0;transform:scale(.5);transition:.2s}
   .ag.act .bubble{opacity:1;transform:scale(1)}
   .agm{display:block;font-size:8px;font-weight:600;color:#9fd9b6;margin-top:1px}
+  .bsrow{display:grid;grid-template-columns:1.5fr .5fr .6fr .6fr .9fr;gap:4px;align-items:center;
+    font-size:11px;padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .bsrow span:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+  .bshd{font-size:9.5px;color:var(--mut);font-weight:700;letter-spacing:.5px;border-bottom:1px solid var(--line)}
+  .bsmk{font-size:9px;color:var(--mut)}
   .vrow{display:flex;align-items:center;gap:10px;margin-top:4px}
   .vleg{font-size:10.5px;line-height:1.55;color:var(--mut)}
   .vleg b{color:var(--txt)} .vleg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
@@ -167,8 +172,8 @@
       <div id="daily"></div>
     </div>
     <div class="panel">
-      <h2><span class="ic">🛡️</span> AI คัดกรอง (VETO)</h2>
-      <div id="vetobox"></div>
+      <h2><span class="ic">🏆</span> สถิติต่อบอท <span class="meta">เกณฑ์ผ่าน PF &ge; 1.15</span></h2>
+      <div id="botstats"></div>
     </div>
   </div>
 
@@ -177,7 +182,7 @@
     <div class="scene">
       <img id="bgimg" alt="trading floor">
       <div class="tint" id="tint"></div>
-      <div class="ov"><div class="t">CLUB EXCHANGE · XAUUSDm M5</div><div class="s" id="scenesub">AI agents trading gold</div></div>
+      <div class="ov"><div class="t">CLUB EXCHANGE · 11 BOTS LIVE</div><div class="s" id="scenesub">XAUUSD · BTC · ETH · FX majors</div></div>
       <div class="ticker"><span id="tick">loading…</span></div>
     </div>
     <div class="panel chart">
@@ -192,18 +197,28 @@
       <canvas id="chartbtc" height="220"></canvas>
       <div class="hint" id="bpxnote"></div>
     </div>
+    <div class="panel chart">
+      <h2><span class="ic">◆</span> ETHUSD · M30 <span class="meta" id="epxmeta"></span></h2>
+      <div class="ph"><span class="px" id="epxnow">—</span><span id="epxchg"></span></div>
+      <canvas id="chartETH" height="220"></canvas>
+      <div class="hint" id="epxnote"></div>
+    </div>
     <div class="cards" id="cards"></div>
   </div>
 
   <!-- RIGHT: LIVE FEED -->
   <div class="col">
     <div class="panel">
-      <h2><span class="ic">⚡</span> Live Transaction · XAUUSD</h2>
+      <h2><span class="ic">⚡</span> ทองคำ · XAUUSD <span class="meta" id="sumxau"></span></h2>
       <div class="feed" id="stream"></div>
     </div>
     <div class="panel">
-      <h2><span class="ic">₿</span> Live Transaction · BTCUSD</h2>
+      <h2><span class="ic">₿</span> คริปโต · BTC + ETH <span class="meta" id="sumcrypto"></span></h2>
       <div class="feed" id="streambtc"></div>
+    </div>
+    <div class="panel">
+      <h2><span class="ic">💱</span> ค่าเงิน · FX <span class="meta" id="sumfx"></span></h2>
+      <div class="feed" id="streamfx"></div>
     </div>
     <div class="panel">
       <h2><span class="ic">🦅</span> HAWK · SAGE Audit Log</h2>
@@ -243,19 +258,19 @@ const AGENTS = [
   {key:"sage",  name:"SAGE",  img:"sage.png",  role:"Risk Manager", color:"#b06bff",
    jd:"ฝ่ายความเสี่ยง — มีสิทธิ์ VETO ไม้ที่เสี่ยง คุม equity guard, ลิมิตขาดทุนรายวัน, เลี่ยงช่วงข่าวแรง และตัดไม้ที่ R:R ไม่คุ้ม"},
   {key:"rider", name:"RIDER", img:"rider.png", role:"Trend Rider", color:"#ffb347",
-   jd:"บอทตัวที่ 2 — เกมถือยาว: รอ H1 breakout กรอบ 48 ชม. แล้วขี่เทรนด์ด้วย trailing 4&times;ATR ถือข้ามวัน ไม้เดียวตลอดเวลา (backtest 17 เดือน PF 1.60)"},
+   jd:"บอทตัวที่ 2 — เกมถือยาว: รอ H1 breakout กรอบ 48 ชม. แล้วขี่เทรนด์ด้วย trailing 4&times;ATR ถือข้ามวัน ไม้เดียวตลอดเวลา · <b>ใส่ BE $5/ล็อก$2.5 เมื่อ 25 ก.ค.</b> แก้อาการกำไรแล้วไหลกลับชน SL (backtest H1 2.5 ปี PF 1.35→2.04 · DD −388→−145)"},
   {key:"hunter",name:"HUNTER",img:"hunter.png",role:"M30 Reversal", color:"#d4b483",
-   jd:"บอทตัวที่ 3 — นักซุ่มยิง M30: รอราคาชนแนวรับ/ต้าน (Order Block &amp; Liquidity Sweep) แล้วเข้าไม้กลับตัว ไม่กรองเทรนด์ · BE+trail สเกล M30 ถือทีละไม้ (backtest 2.5 ปี OB PF 2.07)"},
+   jd:"บอทตัวที่ 3 — นักซุ่มยิง M30: รอราคาชนแนวรับ/ต้าน (Order Block &amp; Liquidity Sweep) แล้วเข้าไม้กลับตัว ไม่กรองเทรนด์ · BE+trail สเกล M30 ถือทีละไม้ · <b>BE 0.8× (จูน 26 ก.ค.)</b> · backtest ต้นทุนจริง $0.11/ไม้: <b>PF 2.16</b> (IS 2.00/OOS 2.42) = คู่ที่ดีที่สุดในตารางทั้งหมด"},
   {key:"zeus",  name:"ZEUS",  img:"zeus.png",  role:"W3 Squeeze XAU", color:"#5b9dff",
-   jd:"บอทตัวที่ 8 — เทพสายฟ้า: รอทองอัดกรอบแคบ (squeeze) แล้วเบรกออกตามเทรนด์ EMA50 · exit BE+trail เดียวกับ HUNTER · backtest 2.5 ปี WR 91.5% PF 3.13 (IS 1.97/OOS 3.63) = ตัว 'ชนะง่าย' ที่บวกจริง · รันคู่ HUNTER พิสูจน์ live"},
+   jd:"บอทตัวที่ 8 — เทพสายฟ้า: รอทองอัดกรอบแคบ (squeeze) แล้วเบรกออกตามเทรนด์ EMA50 · exit BE+trail เดียวกับ HUNTER · backtest ต้นทุนจริง PF 2.26 WR 91% (IS 1.67/OOS 3.91) · <b>BE 1.6×→0.8× เมื่อ 26 ก.ค.</b> · &#9888; WR 91% เป็นเลขโมเดล — breakout เจอ slippage จริงหนัก"},
   {key:"ares",  name:"ARES",  img:"ares.png",  role:"BTC M30 Reversal", color:"#ff4655",
-   jd:"บอทตัวที่ 4 — เทพสงครามสนาม BTCUSD: OB + Sweep กลับตัวบน M30 กลไกเดียวกับ HUNTER ทอง ต่างแค่ symbol + สเกล exit (×42.4) · backtest BTC 3.5 ปี PF 1.57 (OOS 1.60) กำไรทุกปี 2024-2026"},
+   jd:"บอทตัวที่ 4 — เทพสงครามสนาม BTCUSD: OB + Sweep กลับตัวบน M30 กลไกเดียวกับ HUNTER ทอง ต่างแค่ symbol + สเกล exit (×42.4) · backtest ต้นทุนจริง $0.089/ไม้: <b>PF 1.75</b> (IS 1.74/OOS 1.83) · BE 0.8× (จูน 24 ก.ค. จาก 1.6× → PF 1.57→1.73)"},
   {key:"kronos",name:"KRONOS",img:"kronos.png",role:"BTC H1 Reversal", color:"#7ad7f0",
-   jd:"บอทตัวที่ 5 — ไททันแห่งกาลเวลา: OB + Sweep บน H1 BTCUSD เกมยาวกว่า ARES ไม้ใหญ่กว่า · backtest 3.5 ปี PF 1.61 (OOS 2.28) ทนต้นทุนถึง cost40 · รันคู่ ARES เก็บข้อมูลเทียบ M30 vs H1"},
+   jd:"บอทตัวที่ 5 — ไททันแห่งกาลเวลา: OB + Sweep บน H1 BTCUSD เกมยาวกว่า ARES ไม้ใหญ่กว่า · backtest ต้นทุนจริง <b>PF 1.89</b> (IS 1.78/OOS 2.79) · BE 0.8× · รันคู่ ARES เทียบ M30 vs H1"},
   {key:"helios",name:"HELIOS",img:"helios.png",role:"ETH M30 Reversal", color:"#a78bfa",
-   jd:"บอทตัวที่ 7 — สุริยเทพแห่งคริปโต: OB + Sweep กลับตัวบน M30 ETHUSD กลไกเดียวกับ HUNTER/ARES ต่างแค่ symbol + สเกล exit (×2.13) · backtest 3.5 ปี PF 1.41 (OOS 1.43) @คอมจริง ~$1 · zero-spread · lot 0.1 · เทรด 24/7"},
-  {key:"hermes",name:"HERMES",img:"hermes.png",role:"FX Majors M30", color:"#e8c14a",
-   jd:"บอทตัวที่ 6 — เทพการค้าคุมตะกร้าค่าเงินหลัก: กลไกเดียวกับ HUNTER (OB + Sweep กลับตัว M30 ไม่กรองเทรนด์) แต่เทรด 3 คู่พร้อมกัน EURUSD/GBPUSD/USDJPY บัญชี Zero spread · exit สเกลตาม ATR ต่อคู่ · backtest 3.5 ปี PF 1.4-1.6 (ต้นทุนคอมจริง &le;1 pip/รอบ) = ตัวกระจายความเสี่ยงเสริมทอง/BTC"},
+   jd:"บอทตัวที่ 7 — สุริยเทพแห่งคริปโต: OB + Sweep กลับตัวบน M30 ETHUSD กลไกเดียวกับ HUNTER/ARES ต่างแค่ symbol + สเกล exit (×2.13) · backtest ต้นทุนจริง $0.10/ไม้: PF 1.61 (IS 1.65/<b>OOS 1.29 = อ่อนสุดในทีม</b>) · lot 0.1 (โบรกบังคับขั้นต่ำ) · เทรด 24/7 · ZEUS-ETH ทำได้ดีกว่าบน ETH ตัวเดียวกัน"},
+  {key:"hermes",name:"HERMES",img:"hermes.png",role:"FX Majors H1+M30", color:"#e8c14a",
+   jd:"บอทตัวที่ 6 — เทพการค้าคุมตะกร้าค่าเงิน: OB + Sweep กลับตัว ไม่กรองเทรนด์ · เทรด <b>6 คู่</b> พร้อมกัน — EURUSD/GBPUSD/USDJPY/USDCHF บน <b>H1</b> · AUDUSD/AUDJPY บน <b>M30</b> · lot 0.05 · ย้ายเป็น H1 เมื่อ 25 ก.ค. (กำไร/ไม้ขึ้นเท่าตัว) · backtest ต้นทุนจริง $0.06/ไม้: PF 1.42-1.69 ทุกคู่ · ตัด USDCAD (PF 0.99)"},
   {key:"xauh1", name:"HUNTER-H1", img:"hunter_xau_h1.png", role:"XAU H1 Reversal", color:"#f0b429",
    jd:"บอทตัวที่ 9 — HUNTER สายทองเกมยาว: OB + Sweep กลับตัวบน H1 ทองคำ กลไกเดียวกับ HUNTER M30 ต่างแค่ TF + สเกล exit (&times;1.45) · backtest 2.5 ปี ต้นทุนจริง PF 2.00 (IS 1.71/OOS 2.68) · ไม้ใหญ่กว่า M30 SL สูงสุด $46"},
   {key:"xauh4", name:"HUNTER-H4", img:"hunter_xau_h4.png", role:"XAU H4 Reversal", color:"#c98f00",
@@ -324,6 +339,7 @@ let FSTATUS=null, FTRADES=[];                            // HERMES (FX majors M3
 let ELSTATUS=null, ELTRADES=[];                          // HELIOS (ETH M30)
 let ZSTATUS=null, ZTRADES=[];                            // ZEUS (W3 Squeeze XAU)
 let X1STATUS=null, X1TRADES=[], X4STATUS=null, X4TRADES=[];   // HUNTER-XAU-H1 / H4
+let EPRICES=null;                                        // ราคา ETH M30 (HELIOS เขียน eth_prices.json)
 let GJSTATUS=null, GJTRADES=[], ZESTATUS=null, ZETRADES=[];   // RIDER-GJ (GBPJPY) · ZEUS-ETH
 let prevTrades=null, prevOpen=null, actx=null;
 
@@ -364,11 +380,12 @@ async function loadAll(){
   try{ PLAYBOOK=await getText("playbook.md"); }catch(e){ PLAYBOOK=""; }
   try{ REPORT=await getText("review_report.md"); }catch(e){ REPORT=""; }
 
-  if(prevTrades!=null && TRADES.length>prevTrades){ flashAlert("ไม้ใหม่ปิดแล้ว ("+TRADES.length+" ไม้)"); beep(); pulseCard("blade"); }
-  prevTrades=TRADES.length;
+  const _n=allTrades().length;
+  if(prevTrades!=null && _n>prevTrades){ flashAlert("ไม้ใหม่ปิดแล้ว (รวม "+_n+" ไม้)"); beep(); }
+  prevTrades=_n;
 
   renderLive(); renderMetrics(); renderSpark(); renderCards(); renderStream(); renderAudit();
-  renderDaily(); renderPlaybook(); renderVeto(); renderEnv(); renderReport();
+  renderDaily(); renderBotStats(); renderPlaybook(); renderEnv(); renderReport();
   await renderCtx();
   $("clock").textContent=new Date().toLocaleTimeString("th-TH");
   $("foot").textContent="AI Agent Trader · XAUUSDm M5 · รีเฟรชทุก "+REFRESH_SEC+" วิ · เทรดมีความเสี่ยง (DEMO)";
@@ -459,8 +476,6 @@ function renderCards(){
     ridergj:(GJSTATUS&&GJSTATUS.updated&&(Date.now()-new Date(GJSTATUS.updated).getTime())<5*60000)?(GJSTATUS.position?"on":"idle"):"off",
     zeuseth:(ZESTATUS&&ZESTATUS.updated&&(Date.now()-new Date(ZESTATUS.updated).getTime())<5*60000)?(ZESTATUS.position?"on":"idle"):"off",
   };
-  // winrate รวมใต้การ์ด BLADE (ตัวยิงออเดอร์)
-  const _tr=TRADES.length, _wn=TRADES.filter(r=>r.profit>0).length, _wr=_tr?Math.round(_wn/_tr*100):0;
   // สถานะใต้การ์ด RIDER: ไม้ที่ถือ / สถิติสะสม / รอ breakout
   let _rlab="";
   if(RSTATUS&&RSTATUS.position){ const rp=+RSTATUS.position.profit; _rlab="ถือ "+RSTATUS.position.direction+" "+(rp>=0?"+":"")+rp.toFixed(2); }
@@ -480,7 +495,7 @@ function renderCards(){
   // ป้ายใต้การ์ด HERMES (multi-symbol: รวม float ไม้ที่เปิด / สถิติสะสม / รอสัญญาณ)
   let _flab="";
   const _fop=fxOpen(FSTATUS);
-  if(_fop.length){ const fp=_fop.reduce((s,p)=>s+(+p.profit||0),0); _flab="ถือ "+_fop.length+"/3 · "+(fp>=0?"+":"")+fp.toFixed(2); }
+  if(_fop.length){ const fp=_fop.reduce((s,p)=>s+(+p.profit||0),0); _flab="ถือ "+_fop.length+"/"+Object.keys((FSTATUS&&FSTATUS.positions)||{}).length+" คู่ · "+(fp>=0?"+":"")+fp.toFixed(2); }
   else if(FTRADES.length){ const fn=FTRADES.reduce((s,r)=>s+r.profit,0); _flab=FTRADES.length+" ไม้ · NET "+(fn>=0?"+":"")+fn.toFixed(2); }
   else if(FSTATUS){ _flab="รอสัญญาณ majors"; }
   const agm={ blade:"⛔ ปิดทำการ · PF 0.46", rider:_rlab, hunter:_hlab,
@@ -531,12 +546,14 @@ function renderStream(){
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
   // ไม้ค้างของ HERMES (multi-symbol FX)
-  fxOpen(FSTATUS).forEach(p=>{
-    html+=`<div class="frow">
+  // ไม้ที่ถืออยู่ของบอททอง 5 ตัว
+  [["RIDER",RSTATUS],["HUNTER",HSTATUS],["ZEUS",ZSTATUS],["HUNTER-H1",X1STATUS],["HUNTER-H4",X4STATUS]].forEach(([nm,S])=>{
+    if(S&&S.position){ const p=S.position;
+      html+=`<div class="frow">
       <span class="tm">OPEN</span>
       <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
-      <span>${esc(p.symbol)} · <b>HERMES</b> @${fmt(p.entry)} <span class="open">●live</span></span>
-      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`;
+      <span>XAUUSD · <b>${nm}</b> @${fmt(p.entry)} <span class="open">●live</span></span>
+      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
   // รวมไม้ปิดทุกบอท เรียงเวลา + โชว์ราคาเข้า (HERMES พก symbol ต่อไม้)
   const all=[].concat(
@@ -544,7 +561,8 @@ function renderStream(){
     RTRADES.map(r=>({...r,bot:"RIDER"})),
     HTRADES.map(r=>({...r,bot:"HUNTER"})),
     ZTRADES.map(r=>({...r,bot:"ZEUS"})),
-    FTRADES.map(r=>({...r,bot:"HERMES"})));
+    X1TRADES.map(r=>({...r,bot:"HUNTER-H1"})),
+    X4TRADES.map(r=>({...r,bot:"HUNTER-H4"})));
   all.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   const recent=all.slice(-25).reverse();
   html+=recent.map(r=>`<div class="frow">
@@ -556,7 +574,7 @@ function renderStream(){
 
   // ---------- ช่องคริปโต (ARES/KRONOS = BTCUSD · HELIOS = ETHUSD) ----------
   let bhtml="";
-  [["ARES",ASTATUS,"BTCUSD"],["KRONOS",KSTATUS,"BTCUSD"],["HELIOS",ELSTATUS,"ETHUSD"]].forEach(([nm,S,sym])=>{
+  [["ARES",ASTATUS,"BTCUSD"],["KRONOS",KSTATUS,"BTCUSD"],["HELIOS",ELSTATUS,"ETHUSD"],["ZEUS-ETH",ZESTATUS,"ETHUSD"]].forEach(([nm,S,sym])=>{
     if(S&&S.position){ const p=S.position;
       bhtml+=`<div class="frow">
       <span class="tm">OPEN</span>
@@ -565,7 +583,7 @@ function renderStream(){
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
   const ball=[].concat(ATRADES.map(r=>({...r,bot:"ARES",sym:"BTCUSD"})), KTRADES.map(r=>({...r,bot:"KRONOS",sym:"BTCUSD"})),
-                       ELTRADES.map(r=>({...r,bot:"HELIOS",sym:"ETHUSD"})));
+                       ELTRADES.map(r=>({...r,bot:"HELIOS",sym:"ETHUSD"})), ZETRADES.map(r=>({...r,bot:"ZEUS-ETH",sym:"ETHUSD"})));
   ball.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   bhtml+=ball.slice(-25).reverse().map(r=>`<div class="frow">
     <span class="tm">${(r.close_time||"").slice(5,16)}</span>
@@ -573,6 +591,39 @@ function renderStream(){
     <span>${r.sym} · <b>${r.bot}</b> @${fmt(parseFloat(r.entry_price))}</span>
     <span class="${cls(r.profit)}">${sign(r.profit)}</span></div>`).join("");
   $("streambtc").innerHTML=bhtml||"<div class='hint'>ยังไม่มีรายการ</div>";
+
+  // ---------- ช่อง FX (HERMES หลายคู่ · RIDER-GJ = GBPJPY) ----------
+  let fhtml="";
+  fxOpen(FSTATUS).forEach(p=>{
+    fhtml+=`<div class="frow">
+      <span class="tm">OPEN</span>
+      <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
+      <span>${esc(p.symbol)} · <b>HERMES</b> @${fmt(p.entry,5)} <span class="open">●live</span></span>
+      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`;
+  });
+  if(GJSTATUS&&GJSTATUS.position){ const p=GJSTATUS.position;
+    fhtml+=`<div class="frow">
+      <span class="tm">OPEN</span>
+      <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
+      <span>GBPJPY · <b>RIDER-GJ</b> @${fmt(p.entry,3)} <span class="open">●live</span></span>
+      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
+  const fall=[].concat(FTRADES.map(r=>({...r,bot:"HERMES"})),
+                       GJTRADES.map(r=>({...r,bot:"RIDER-GJ",symbol:"GBPJPY"})));
+  fall.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
+  fhtml+=fall.slice(-25).reverse().map(r=>`<div class="frow">
+    <span class="tm">${(r.close_time||"").slice(5,16)}</span>
+    <span class="tag ${r.direction==='BUY'?'t-buy':'t-sell'}">${r.direction||'-'}</span>
+    <span>${esc(r.symbol||'FX')} · <b>${r.bot}</b> @${fmt(parseFloat(r.entry_price),5)}</span>
+    <span class="${cls(r.profit)}">${sign(r.profit)}</span></div>`).join("");
+  $("streamfx").innerHTML=fhtml||"<div class='hint'>ยังไม่มีรายการ</div>";
+
+  // ---------- สรุป n / NET ต่อกลุ่ม บนหัวข้อ ----------
+  const grp=(arr)=>{ const n=arr.length, net=arr.reduce((s,r)=>s+(+r.profit||0),0);
+    return n? `${n} ไม้ · NET ${net>=0?"+":""}${net.toFixed(2)}` : "ยังไม่มีไม้"; };
+  const setm=(id,txt)=>{ const e=$(id); if(e) e.textContent=txt; };
+  setm("sumxau", grp(all));
+  setm("sumcrypto", grp(ball));
+  setm("sumfx", grp(fall));
 }
 
 function renderAudit(){
@@ -587,9 +638,39 @@ function renderAudit(){
   }).join("")||"<div class='hint'>ยังไม่มีการตัดสินใจ</div>";
 }
 
+function renderBotStats(){
+  const box=$("botstats"); if(!box) return;
+  const rows=[
+    ["RIDER",RTRADES,"XAU H1"],["HUNTER",HTRADES,"XAU M30"],["ZEUS",ZTRADES,"XAU M30"],
+    ["HUNTER-H1",X1TRADES,"XAU H1"],["HUNTER-H4",X4TRADES,"XAU H4"],
+    ["ARES",ATRADES,"BTC M30"],["KRONOS",KTRADES,"BTC H1"],
+    ["HELIOS",ELTRADES,"ETH M30"],["ZEUS-ETH",ZETRADES,"ETH M30"],
+    ["HERMES",FTRADES,"FX 6 คู่"],["RIDER-GJ",GJTRADES,"GBPJPY M30"]];
+  const out=rows.map(([nm,T,mk])=>{
+    const n=T.length;
+    if(!n) return {nm,mk,n:0,net:0,wr:0,pf:null};
+    const net=T.reduce((s,r)=>s+(+r.profit||0),0);
+    const w=T.filter(r=>r.profit>0), l=T.filter(r=>r.profit<=0);
+    const gp=w.reduce((s,r)=>s+r.profit,0), gl=-l.reduce((s,r)=>s+r.profit,0);
+    return {nm,mk,n,net,wr:w.length/n*100,pf:gl>0?gp/gl:null};
+  }).sort((a,b)=>b.n-a.n);
+  box.innerHTML=`<div class="bsrow bshd"><span>บอท</span><span>ไม้</span><span>WR</span><span>PF</span><span>NET</span></div>`+
+   out.map(r=>{
+    const pf = r.pf==null ? (r.n?"∞":"—") : r.pf.toFixed(2);
+    const pfc = r.pf==null ? "" : (r.pf>=1.15?"pos":(r.pf>=1?"neu":"neg"));
+    const need = r.n<50 ? ` title="ยังไม่ถึง 50 ไม้ (${r.n}) — ตัดสินไม่ได้"` : "";
+    return `<div class="bsrow"${need}>
+      <span><b>${r.nm}</b><br><span class="bsmk">${r.mk}</span></span>
+      <span class="${r.n>=50?'pos':''}">${r.n}</span>
+      <span>${r.n?r.wr.toFixed(0)+"%":"—"}</span>
+      <span class="${pfc}">${pf}</span>
+      <span class="${cls(r.net)}">${r.n?sign(r.net):"—"}</span></div>`;
+  }).join("");
+}
+
 function renderDaily(){
   const by={};
-  TRADES.forEach(r=>{const d=(r.close_time||"").slice(0,10); if(!d)return; (by[d]=by[d]||[]).push(r.profit);});
+  allTrades().forEach(r=>{const d=(r.close_time||"").slice(0,10); if(!d)return; (by[d]=by[d]||[]).push(r.profit);});
   const days=Object.keys(by).sort().slice(-7);
   if(!days.length){$("daily").innerHTML="<div class='hint'>ยังไม่มีข้อมูล</div>";return;}
   const max=Math.max.apply(null, days.map(d=>Math.abs(by[d].reduce((a,b)=>a+b,0))).concat([1]));
@@ -667,7 +748,7 @@ function renderReport(){
 function todayNet(){
   if(STATUS&&STATUS.pnl_today!=null) return STATUS.pnl_today;
   const lt=lastOf(TRADES); const d=((lt&&lt.close_time)||"").slice(0,10);
-  return TRADES.filter(r=>(r.close_time||"").startsWith(d)).reduce((s,r)=>s+r.profit,0);
+  return allTrades().filter(r=>(r.close_time||"").startsWith(d)).reduce((s,r)=>s+r.profit,0);
 }
 
 // ไฟในห้องเปลี่ยนสีตามกำไรวันนี้
@@ -722,8 +803,9 @@ async function renderCtx(){
   }catch(e){}
   $("ctx").innerHTML=html||"<div class='hint'>ยังไม่มีข้อมูลบริบท</div>";
 
-  const net=TRADES.reduce((s,r)=>s+r.profit,0);
-  $("tick").textContent=`  XAUUSDm   NET ${sign(net)} USD    TRADES ${TRADES.length}    WINRATE ${TRADES.length?fmt(TRADES.filter(r=>r.profit>0).length/TRADES.length*100,1):0}%    ${botLive()?"● BOT LIVE":"○ BOT OFFLINE"}    `.repeat(3);
+  const _AT=allTrades();
+  const net=_AT.reduce((s,r)=>s+r.profit,0);
+  $("tick").textContent=`  ทั้งพอร์ต (11 บอท)   NET ${sign(net)} USD    TRADES ${_AT.length}    WINRATE ${_AT.length?fmt(_AT.filter(r=>r.profit>0).length/_AT.length*100,1):0}%    ${botLive()?"● BOT LIVE":"○ BOT OFFLINE"}    `.repeat(3);
 }
 
 // ===== live price chart (candlestick) =====
@@ -731,6 +813,7 @@ let PRICES=null, BPRICES=null;
 async function loadPrices(){
   try{ PRICES=await getJSON("prices.json"); }catch(e){ PRICES=null; }
   try{ BPRICES=await getJSON("btc_prices.json"); }catch(e){ BPRICES=null; }
+  try{ EPRICES=await getJSON("eth_prices.json"); }catch(e){ EPRICES=null; }
   // กราฟทอง (BLADE/RIDER/HUNTER)
   renderChart(PRICES, {cv:"chart",note:"pxnote",now:"pxnow",chg:"pxchg",meta:"pxmeta"},
               (STATUS&&STATUS.open_positions)||[], TRADES);
@@ -739,6 +822,11 @@ async function loadPrices(){
                   .map(s=>({price_open:s.position.entry, type:s.position.direction}));
   renderChart(BPRICES, {cv:"chartbtc",note:"bpxnote",now:"bpxnow",chg:"bpxchg",meta:"bpxmeta"},
               btcOpens, [].concat(ATRADES||[], KTRADES||[]));
+  // กราฟ ETH (HELIOS + ZEUS-ETH)
+  const ethOpens=[ELSTATUS,ZESTATUS].filter(s=>s&&s.position)
+                  .map(s=>({price_open:s.position.entry, type:s.position.direction}));
+  renderChart(EPRICES, {cv:"chartETH",note:"epxnote",now:"epxnow",chg:"epxchg",meta:"epxmeta"},
+              ethOpens, [].concat(ELTRADES||[], ZETRADES||[]));
 }
 function renderChart(P, ids, opens, trades){
   const cv=$(ids.cv); if(!cv) return;
