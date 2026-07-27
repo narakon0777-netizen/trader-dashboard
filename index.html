@@ -294,9 +294,9 @@ const lastOf=a=>a&&a.length?a[a.length-1]:null;
 // HERMES เป็น multi-symbol: status มี .positions{SYM:{...}|null} — คืน list ไม้ที่เปิดอยู่
 function fxOpen(S){ if(!S||!S.positions)return[]; return Object.keys(S.positions)
   .filter(k=>S.positions[k]).map(k=>({symbol:k,...S.positions[k]})); }
-// รวมไม้ปิดของทุกบอท (BLADE+RIDER+HUNTER+ARES+KRONOS+HERMES) — ใช้ในช่อง ACCOUNT METRICS + กราฟ
-function allTrades(){ return [].concat(
-  (TRADES||[]).map(r=>({...r,bot:"BLADE"})),
+// รวมไม้ปิดของบอทที่รันอยู่ — ใช้ใน ACCOUNT METRICS/กราฟ (ไม่ปน BLADE ที่ retired)
+function allTrades({includeArchived=false}={}){ return [].concat(
+  includeArchived ? (TRADES||[]).map(r=>({...r,bot:"BLADE"})) : [],
   (RTRADES||[]).map(r=>({...r,bot:"RIDER"})),
   (HTRADES||[]).map(r=>({...r,bot:"HUNTER"})),
   (ATRADES||[]).map(r=>({...r,bot:"ARES"})),
@@ -335,6 +335,21 @@ function parseCSV(text){
   if(!rows.length)return[];const h=rows[0];
   return rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k.trim()]=(r[i]==null?"":r[i]).trim());return o;});
 }
+// เก็บเฉพาะไม้ปิดสมบูรณ์: ตัด exit=0 และ ticket ซ้ำจาก raw CSV โดยไม่แก้ไฟล์ต้นทาง
+function parseClosedTrades(text){
+  const seen=new Set();
+  return parseCSV(text).reduce((out,r)=>{
+    const profit=parseFloat(r.profit);
+    if(r.profit===""||!Number.isFinite(profit))return out;
+    const exit=(r.exit_price||"").trim();
+    if(exit!==""&&Number(exit)===0)return out;
+    const ticket=(r.ticket||"").trim();
+    if(ticket&&seen.has(ticket))return out;
+    if(ticket)seen.add(ticket);
+    out.push({...r,profit});
+    return out;
+  },[]);
+}
 async function getText(n){const r=await fetch(DATA_BASE+n+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error(n);return r.text();}
 async function getJSON(n){return JSON.parse(await getText(n));}
 
@@ -359,34 +374,34 @@ document.addEventListener("click", function(){ if(actx&&actx.state==="suspended"
 
 async function loadAll(){
   try{ STATUS=await getJSON("status.json"); }catch(e){ STATUS=null; }
-  try{ TRADES=parseCSV(await getText("trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ TRADES=[]; }
+  try{ TRADES=parseClosedTrades(await getText("trades.csv")); }catch(e){ TRADES=[]; }
   // decisions.csv (303 KB) = ของ HAWK ที่ปิดตั้งแต่ 3 ก.ค. ไฟล์ไม่โตอีก -> ดึงครั้งเดียวตอนเปิดหน้า
   // (เดิมดึงทุก 60 วิ = 91% ของ egress ทั้งหมด → 13.8 GB/เดือน ถ้าเปิดแท็บทิ้ง เกินลิมิต free 5 GB)
   if(!DECS.length){ try{ DECS=parseCSV(await getText("decisions.csv")); }catch(e){ DECS=[]; } }
   try{ RSTATUS=await getJSON("rider_status.json"); }catch(e){ RSTATUS=null; }
-  try{ RTRADES=parseCSV(await getText("trend_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ RTRADES=[]; }
+  try{ RTRADES=parseClosedTrades(await getText("trend_trades.csv")); }catch(e){ RTRADES=[]; }
   try{ HSTATUS=await getJSON("hunter_status.json"); }catch(e){ HSTATUS=null; }
-  try{ HTRADES=parseCSV(await getText("hunter_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ HTRADES=[]; }
+  try{ HTRADES=parseClosedTrades(await getText("hunter_trades.csv")); }catch(e){ HTRADES=[]; }
   try{ ASTATUS=await getJSON("hunter_btc_status.json"); }catch(e){ ASTATUS=null; }
-  try{ ATRADES=parseCSV(await getText("hunter_btc_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ATRADES=[]; }
+  try{ ATRADES=parseClosedTrades(await getText("hunter_btc_trades.csv")); }catch(e){ ATRADES=[]; }
   try{ KSTATUS=await getJSON("hunter_btc_h1_status.json"); }catch(e){ KSTATUS=null; }
-  try{ KTRADES=parseCSV(await getText("hunter_btc_h1_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ KTRADES=[]; }
+  try{ KTRADES=parseClosedTrades(await getText("hunter_btc_h1_trades.csv")); }catch(e){ KTRADES=[]; }
   try{ X1STATUS=await getJSON("hunter_xau_h1_status.json"); }catch(e){ X1STATUS=null; }
-  try{ X1TRADES=parseCSV(await getText("hunter_xau_h1_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ X1TRADES=[]; }
+  try{ X1TRADES=parseClosedTrades(await getText("hunter_xau_h1_trades.csv")); }catch(e){ X1TRADES=[]; }
   try{ X4STATUS=await getJSON("hunter_xau_h4_status.json"); }catch(e){ X4STATUS=null; }
-  try{ X4TRADES=parseCSV(await getText("hunter_xau_h4_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ X4TRADES=[]; }
+  try{ X4TRADES=parseClosedTrades(await getText("hunter_xau_h4_trades.csv")); }catch(e){ X4TRADES=[]; }
   try{ GJSTATUS=await getJSON("rider_gbpjpy_status.json"); }catch(e){ GJSTATUS=null; }
-  try{ GJTRADES=parseCSV(await getText("rider_gbpjpy_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ GJTRADES=[]; }
+  try{ GJTRADES=parseClosedTrades(await getText("rider_gbpjpy_trades.csv")); }catch(e){ GJTRADES=[]; }
   try{ ZESTATUS=await getJSON("w3_eth_status.json"); }catch(e){ ZESTATUS=null; }
-  try{ ZETRADES=parseCSV(await getText("w3_eth_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ZETRADES=[]; }
+  try{ ZETRADES=parseClosedTrades(await getText("w3_eth_trades.csv")); }catch(e){ ZETRADES=[]; }
   try{ ATHSTATUS=await getJSON("athena_xau_m30_status.json"); }catch(e){ ATHSTATUS=null; }
-  try{ ATHTRADES=parseCSV(await getText("athena_xau_m30_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ATHTRADES=[]; }
+  try{ ATHTRADES=parseClosedTrades(await getText("athena_xau_m30_trades.csv")); }catch(e){ ATHTRADES=[]; }
   try{ FSTATUS=await getJSON("fx_status.json"); }catch(e){ FSTATUS=null; }
-  try{ FTRADES=parseCSV(await getText("fx_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ FTRADES=[]; }
+  try{ FTRADES=parseClosedTrades(await getText("fx_trades.csv")); }catch(e){ FTRADES=[]; }
   try{ ELSTATUS=await getJSON("hunter_eth_status.json"); }catch(e){ ELSTATUS=null; }
-  try{ ELTRADES=parseCSV(await getText("hunter_eth_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ELTRADES=[]; }
+  try{ ELTRADES=parseClosedTrades(await getText("hunter_eth_trades.csv")); }catch(e){ ELTRADES=[]; }
   try{ ZSTATUS=await getJSON("w3_status.json"); }catch(e){ ZSTATUS=null; }
-  try{ ZTRADES=parseCSV(await getText("w3_trades.csv")).filter(r=>r.profit!==""&&!isNaN(parseFloat(r.profit))).map(r=>({...r,profit:parseFloat(r.profit)})); }catch(e){ ZTRADES=[]; }
+  try{ ZTRADES=parseClosedTrades(await getText("w3_trades.csv")); }catch(e){ ZTRADES=[]; }
   try{ PLAYBOOK=await getText("playbook.md"); }catch(e){ PLAYBOOK=""; }
   try{ REPORT=await getText("review_report.md"); }catch(e){ REPORT=""; }
 
@@ -405,8 +420,9 @@ async function loadAll(){
 // อัปเดตเฉพาะ Account metrics จาก status.json (ไฟล์เล็ก ~250 ไบต์) — เรียกถี่ได้โดยไม่เปลือง bandwidth
 async function loadStatus(){
   try{ STATUS=await getJSON("status.json"); }catch(e){ return; }
-  const oc=(STATUS&&STATUS.open_count)||0;
-  if(prevOpen!=null && oc>prevOpen){ flashAlert("เปิดออเดอร์ใหม่!"); beep(); pulseCard("blade"); }
+  // account_status ตั้ง open_count=0 โดยออกแบบ จึงต้องรวมจาก status ของบอทแต่ละตัว
+  const oc=openCountAll();
+  if(prevOpen!=null && oc>prevOpen){ flashAlert("เปิดออเดอร์ใหม่!"); beep(); }
   prevOpen=oc;
   renderLive(); renderMetrics(); renderStream(); renderEnv();
 }
@@ -424,7 +440,7 @@ function renderLive(){
 }
 
 function renderMetrics(){
-  // ===== รวมทุกบอท (BLADE+RIDER+HUNTER+ARES+KRONOS+HERMES) =====
+  // ===== รวมเฉพาะบอทที่รันอยู่ (ไม่รวม BLADE retired) =====
   const AT=allTrades();
   const closedNet=AT.reduce((s,r)=>s+r.profit,0);
   // Balance/Equity/Floating = ระดับบัญชี (ทุกบอทบัญชีเดียวกัน = รวมอยู่แล้วจาก account_info)
@@ -542,23 +558,6 @@ function renderCards(){
 
 function renderStream(){
   let html="";
-  if(STATUS&&STATUS.open_positions&&STATUS.open_positions.length){
-    html+=STATUS.open_positions.map(p=>`<div class="frow">
-      <span class="tm">OPEN</span>
-      <span class="tag ${p.type==='BUY'?'t-buy':'t-sell'}">${p.type}</span>
-      <span>${p.symbol||STATUS.symbol||''} · <b>BLADE</b> @${fmt(p.price_open)} <span class="open">●live</span></span>
-      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`).join("");
-  }
-  // ไม้ค้างของ RIDER / HUNTER
-  [["RIDER",RSTATUS],["HUNTER",HSTATUS],["ZEUS",ZSTATUS]].forEach(([nm,S])=>{
-    if(S&&S.position){ const p=S.position;
-      html+=`<div class="frow">
-      <span class="tm">OPEN</span>
-      <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
-      <span>XAUUSD · <b>${nm}</b> @${fmt(p.entry||p.price_open)} <span class="open">●live</span></span>
-      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
-  });
-  // ไม้ค้างของ HERMES (multi-symbol FX)
   // ไม้ที่ถืออยู่ของบอททอง 6 ตัว
   [["RIDER",RSTATUS],["HUNTER",HSTATUS],["ZEUS",ZSTATUS],["HUNTER-H1",X1STATUS],["HUNTER-H4",X4STATUS],["ATHENA",ATHSTATUS]].forEach(([nm,S])=>{
     if(S&&S.position){ const p=S.position;
@@ -570,7 +569,6 @@ function renderStream(){
   });
   // รวมไม้ปิดทุกบอท เรียงเวลา + โชว์ราคาเข้า (HERMES พก symbol ต่อไม้)
   const all=[].concat(
-    TRADES.map(r=>({...r,bot:"BLADE"})),
     RTRADES.map(r=>({...r,bot:"RIDER"})),
     HTRADES.map(r=>({...r,bot:"HUNTER"})),
     ZTRADES.map(r=>({...r,bot:"ZEUS"})),
@@ -734,12 +732,12 @@ function botReview(){
   };
   const cut=Date.now()-7*864e5;
   const rec=a=>a.filter(r=>new Date(((r.close_time||"").replace(" ","T"))+"Z").getTime()>=cut);
-  return `<div class="rh">📊 รีวิวสด 7 วันล่าสุด — แยกรายบอท</div>
+  return `<div class="rh">📊 รีวิวสด 7 วันล่าสุด — บอทที่รันอยู่</div>
   <table class="rtb"><tr><th>บอท</th><th>ไม้</th><th>NET</th><th>WR</th><th>PF</th></tr>
-  ${mk("BLADE",rec(TRADES))}${mk("RIDER",rec(RTRADES))}${mk("HUNTER",rec(HTRADES))}</table>
+  ${mk("RIDER",rec(RTRADES))}${mk("HUNTER",rec(HTRADES))}</table>
   <div class="rh">ตลอดชีพ (นับตั้งแต่ไฟล์ปัจจุบัน)</div>
   <table class="rtb"><tr><th>บอท</th><th>ไม้</th><th>NET</th><th>WR</th><th>PF</th></tr>
-  ${mk("BLADE",TRADES)}${mk("RIDER",RTRADES)}${mk("HUNTER",HTRADES)}</table>`;
+  ${mk("RIDER",RTRADES)}${mk("HUNTER",HTRADES)}</table>`;
 }
 function renderReport(){
   const box=$("report"); if(!box) return;
