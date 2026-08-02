@@ -283,11 +283,13 @@ const AGENTS = [
    jd:"บอทตัวที่ 13 — เทพีนักวางแผน สาย <b>ตามเทรนด์</b> ตัวแรกของทีมทอง: รอ inside bar (แท่งบีบตัวในกรอบแท่งแม่) แล้วเบรกออกตามทิศ EMA50 บน H1 · body ต้อง &ge; 0.45&times;ATR14 · <b>ยิงได้เฉพาะวินาทีแรกของแท่ง M30 ใหม่</b> เกิน 45 วิ = ข้ามไม้ (ปิดต้นเหตุ BT-live gap ของ BLADE) · backtest 2.5 ปี ต้นทุนจริง PF 2.66 (2024 1.93/2025 2.03/2026 4.21) · ทับ entry กับ HUNTER แค่ 2.4% = ช่วยลด correlation ทีมทอง · &#9888; PF เป็นเลข backtest — เริ่มเก็บ demo 26 ก.ค."},
   {key:"apollo", name:"APOLLO", img:"apollo.png", role:"M30 · Breakout → Retest · H1 Trend", color:"#e5b84b",
    jd:"บอทตัวที่ 14 — นักธนูผู้รอจังหวะ: ใช้ EMA50 บน H1 ยืนยันทิศทาง รอ M30 เบรกกรอบ 12 แท่งแล้วกลับมาทดสอบภายใน 6 แท่งก่อนเข้า · breakout/retest body &ge; 0.45&times;ATR14 · penetration &le; 0.30&times;ATR · <b>เข้าเฉพาะต้นแท่ง M30 ใหม่</b> เกิน 45 วิ = ข้าม · TP/SL สูงสุด $32 · BE 0.8/0.4 แบบ fast-path ทุก 1 วิ · bot-code backtest PF 1.98 และ H1 จริง PF 2.06 · &#9888; เริ่มเก็บ demo 28 ก.ค. ต้องรอประมาณ 50 ไม้ก่อนตัดสิน"},
+  {key:"argus", name:"ARGUS", img:"argus.png", role:"CME-AI Guarded Trader · XAU M5", color:"#d9b45a",
+   jd:"บอทตัวที่ 15 — ผู้พิทักษ์กำแพง CME: AI เสนอ LONG/SHORT/NEUTRAL จาก Put/Call wall แต่ Guard ต้องเห็นแท่ง M5 rejection และผ่าน account, spread, exposure, R:R, risk และ idempotency ก่อนเสมอ · <b>เริ่ม SHADOW 5 วันทำการ</b> · 0.01 lot · risk ≤ $10 · BE ตรวจ bid/ask ทุก 1 วินาที · AI ไม่มีสิทธิ์ส่ง แก้ หรือปิดออเดอร์"},
   {key:"auto",  name:"AUTO",  img:"auto.png",  role:"Autonomous Ops", color:"#32e0e0",
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
 ];
 
-const LIVE_BOTS=13;   // จำนวนบอทที่รัน (ไม่รวม BLADE ที่ปิดแล้ว) — แก้ที่นี่ที่เดียว
+const LIVE_BOTS=14;   // รวม ARGUS (SHADOW/DEMO) ไม่รวม BLADE ที่ปิดแล้ว
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
@@ -311,7 +313,8 @@ function allTrades({includeArchived=false}={}){ return [].concat(
   (GJTRADES||[]).map(r=>({...r,bot:"RIDER-GJ"})),
   (ZETRADES||[]).map(r=>({...r,bot:"ZEUS-ETH"})),
   (ATHTRADES||[]).map(r=>({...r,bot:"ATHENA"})),
-  (APTRADES||[]).map(r=>({...r,bot:"APOLLO"}))); }
+  (APTRADES||[]).map(r=>({...r,bot:"APOLLO"})),
+  (ARGTRADES||[]).map(r=>({...r,bot:"ARGUS"}))); }
 // จำนวนไม้ที่เปิดอยู่รวมทุกบอท
 function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((RSTATUS&&RSTATUS.position)?1:0)+((HSTATUS&&HSTATUS.position)?1:0)
@@ -320,11 +323,13 @@ function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((X1STATUS&&X1STATUS.position)?1:0)+((X4STATUS&&X4STATUS.position)?1:0)
   +((GJSTATUS&&GJSTATUS.position)?1:0)+((ZESTATUS&&ZESTATUS.position)?1:0)
   +((ATHSTATUS&&ATHSTATUS.position)?1:0)+((APSTATUS&&APSTATUS.position)?1:0)
+  +((ARGSTATUS&&ARGSTATUS.mode==="DEMO"&&ARGSTATUS.position)?1:0)
   +fxOpen(FSTATUS).length; }
 // floating รวม (fallback ตอนไม่มี status.json ระดับบัญชี)
 function floatAll(){ let f=0;
   if(STATUS&&STATUS.open_positions) f+=STATUS.open_positions.reduce((s,p)=>s+(+p.profit||0),0);
   [RSTATUS,HSTATUS,ASTATUS,KSTATUS,ELSTATUS,ZSTATUS,X1STATUS,X4STATUS,GJSTATUS,ZESTATUS,ATHSTATUS,APSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
+  if(ARGSTATUS&&ARGSTATUS.mode==="DEMO"&&ARGSTATUS.position) f+=(+ARGSTATUS.position.profit||0);
   f+=fxOpen(FSTATUS).reduce((s,p)=>s+(+p.profit||0),0);
   return f; }
 
@@ -367,6 +372,7 @@ let EPRICES=null;                                        // ราคา ETH M30
 let GJSTATUS=null, GJTRADES=[], ZESTATUS=null, ZETRADES=[];   // RIDER-GJ (GBPJPY) · ZEUS-ETH
 let ATHSTATUS=null, ATHTRADES=[];                        // ATHENA (XAU M30 Inside-Bar Continuation)
 let APSTATUS=null, APTRADES=[];                          // APOLLO (XAU M30 Breakout -> Retest)
+let ARGSTATUS=null, ARGTRADES=[];                        // ARGUS (CME-AI Guarded XAU M5; DEMO trades เท่านั้น)
 let prevTrades=null, prevOpen=null, actx=null;
 
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -403,6 +409,8 @@ async function loadAll(){
   try{ ATHTRADES=parseClosedTrades(await getText("athena_xau_m30_trades.csv")); }catch(e){ ATHTRADES=[]; }
   try{ APSTATUS=await getJSON("apollo_status.json"); }catch(e){ APSTATUS=null; }
   try{ APTRADES=parseClosedTrades(await getText("apollo_trades.csv")); }catch(e){ APTRADES=[]; }
+  try{ ARGSTATUS=await getJSON("argus_cme_status.json"); }catch(e){ ARGSTATUS=null; }
+  try{ ARGTRADES=parseClosedTrades(await getText("argus_cme_trades.csv")); }catch(e){ ARGTRADES=[]; }
   try{ FSTATUS=await getJSON("fx_status.json"); }catch(e){ FSTATUS=null; }
   try{ FTRADES=parseClosedTrades(await getText("fx_trades.csv")); }catch(e){ FTRADES=[]; }
   try{ ELSTATUS=await getJSON("hunter_eth_status.json"); }catch(e){ ELSTATUS=null; }
@@ -511,6 +519,7 @@ function renderCards(){
     zeuseth:(ZESTATUS&&ZESTATUS.updated&&(Date.now()-new Date(ZESTATUS.updated).getTime())<5*60000)?(ZESTATUS.position?"on":"idle"):"off",
     athena:(ATHSTATUS&&ATHSTATUS.updated&&(Date.now()-new Date(ATHSTATUS.updated).getTime())<5*60000)?(ATHSTATUS.position?"on":"idle"):"off",
     apollo:(APSTATUS&&APSTATUS.updated&&(Date.now()-new Date(APSTATUS.updated).getTime())<5*60000)?(APSTATUS.position?"on":"idle"):"off",
+    argus:(ARGSTATUS&&ARGSTATUS.updated&&(Date.now()-new Date(ARGSTATUS.updated).getTime())<5*60000)?(ARGSTATUS.position?"on":"idle"):"off",
   };
   // สถานะใต้การ์ด RIDER: ไม้ที่ถือ / สถิติสะสม / รอ breakout
   let _rlab="";
@@ -534,6 +543,15 @@ function renderCards(){
   if(_fop.length){ const fp=_fop.reduce((s,p)=>s+(+p.profit||0),0); _flab="ถือ "+_fop.length+"/"+Object.keys((FSTATUS&&FSTATUS.positions)||{}).length+" คู่ · "+(fp>=0?"+":"")+fp.toFixed(2); }
   else if(FTRADES.length){ const fn=FTRADES.reduce((s,r)=>s+r.profit,0); _flab=FTRADES.length+" ไม้ · NET "+(fn>=0?"+":"")+fn.toFixed(2); }
   else if(FSTATUS){ _flab="รอสัญญาณ majors"; }
+  let _arglab="";
+  if(ARGSTATUS){
+    const m=ARGSTATUS.metrics||{}, p=ARGSTATUS.plan||{}, g=ARGSTATUS.guard||{}, bits=[ARGSTATUS.mode||"-"];
+    if(ARGSTATUS.snapshot_age_sec!=null) bits.push("snap "+Math.max(0,Math.round(ARGSTATUS.snapshot_age_sec/60))+"m");
+    if(p.direction) bits.push(p.direction+" "+fmt(p.confidence,0)+"%");
+    if(g.verdict) bits.push(g.verdict+(g.guard_latency_ms!=null?" "+fmt(g.guard_latency_ms,1)+"ms":""));
+    bits.push((m.trades||0)+" ไม้ · NET "+sign(m.net||0)+" · PF "+(m.pf==null?"—":fmt(m.pf,2)));
+    _arglab=bits.join(" · ");
+  }
   const agm={ blade:"⛔ ปิดทำการ · PF 0.46", rider:_rlab, hunter:_hlab,
               ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1"),
               hermes:_flab, helios:botLab(ELSTATUS,ELTRADES,"รอสัญญาณ ETH M30"),
@@ -543,7 +561,8 @@ function renderCards(){
               ridergj:botLab(GJSTATUS,GJTRADES,"รอ breakout GBPJPY"),
               zeuseth:botLab(ZESTATUS,ZETRADES,"รอ squeeze ETH"),
               athena:botLab(ATHSTATUS,ATHTRADES,"รอ inside-bar ทอง M30"),
-              apollo:botLab(APSTATUS,APTRADES,"รอ breakout → retest ทอง M30") };
+              apollo:botLab(APSTATUS,APTRADES,"รอ breakout → retest ทอง M30"),
+              argus:_arglab };
   const wrap=$("cards");
   const flipped={};
   [].forEach.call(wrap.querySelectorAll(".ag"),function(el,i){ if(el.classList.contains("flipped")) flipped[i]=1; });
@@ -567,7 +586,7 @@ function renderCards(){
 
 function renderStream(){
   let html="";
-  // ไม้ที่ถืออยู่ของบอททอง 7 ตัว
+  // ไม้ที่ถืออยู่ของบอททองเดิม
   [["RIDER",RSTATUS],["HUNTER",HSTATUS],["ZEUS",ZSTATUS],["HUNTER-H1",X1STATUS],["HUNTER-H4",X4STATUS],["ATHENA",ATHSTATUS],["APOLLO",APSTATUS]].forEach(([nm,S])=>{
     if(S&&S.position){ const p=S.position;
       html+=`<div class="frow">
@@ -576,6 +595,12 @@ function renderStream(){
       <span>XAUUSD · <b>${nm}</b> @${fmt(p.entry)} <span class="open">●live</span></span>
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   });
+  if(ARGSTATUS&&ARGSTATUS.position){ const p=ARGSTATUS.position, shadow=ARGSTATUS.mode==="SHADOW";
+    html+=`<div class="frow">
+      <span class="tm">${shadow?'SIM':'OPEN'}</span>
+      <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
+      <span>XAUUSD · <b>ARGUS</b> @${fmt(p.entry)} <span class="open">●${shadow?'shadow':'live'}</span></span>
+      <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   // รวมไม้ปิดทุกบอท เรียงเวลา + โชว์ราคาเข้า (HERMES พก symbol ต่อไม้)
   const all=[].concat(
     RTRADES.map(r=>({...r,bot:"RIDER"})),
@@ -584,7 +609,8 @@ function renderStream(){
     X1TRADES.map(r=>({...r,bot:"HUNTER-H1"})),
     X4TRADES.map(r=>({...r,bot:"HUNTER-H4"})),
     ATHTRADES.map(r=>({...r,bot:"ATHENA"})),
-    APTRADES.map(r=>({...r,bot:"APOLLO"})));
+    APTRADES.map(r=>({...r,bot:"APOLLO"})),
+    ARGTRADES.map(r=>({...r,bot:"ARGUS"})));
   all.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   const recent=all.slice(-25).reverse();
   html+=recent.map(r=>`<div class="frow">
@@ -668,7 +694,8 @@ function renderBotStats(){
     ["ARES",ATRADES,"BTC M30"],["KRONOS",KTRADES,"BTC H1"],
     ["HELIOS",ELTRADES,"ETH M30"],["ZEUS-ETH",ZETRADES,"ETH M30"],
     ["HERMES",FTRADES,"FX 6 คู่"],["RIDER-GJ",GJTRADES,"GBPJPY M30"],
-    ["ATHENA",ATHTRADES,"XAU M30 IB"],["APOLLO",APTRADES,"XAU M30 BRT"]];
+    ["ATHENA",ATHTRADES,"XAU M30 IB"],["APOLLO",APTRADES,"XAU M30 BRT"],
+    ["ARGUS",ARGTRADES,"XAU M5 CME"]];
   const out=rows.map(([nm,T,mk])=>{
     const n=T.length;
     if(!n) return {nm,mk,n:0,net:0,wr:0,pf:null};
