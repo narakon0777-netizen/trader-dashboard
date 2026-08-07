@@ -253,8 +253,8 @@ const STALE_MIN = 3;
 const AGENTS = [
   {key:"hawk",  name:"HAWK",  img:"hawk.png",  role:"Market Analyst", color:"#39ff14",
    jd:"นักวิเคราะห์ตลาด — เสนอสัญญาณเข้าเทรด อ่านเทรนด์/โครงสร้างราคา/โมเมนตัม + บริบท CME &amp; ข่าว แล้วเสนอ BUY/SELL พร้อมระดับความมั่นใจให้ทีมตัดสิน"},
-  {key:"blade", name:"BLADE", img:"blade.png", role:"Trade Executor", color:"#ff6b6b", retired:true,
-   jd:"มือวางออเดอร์ — ยิง/ปิดออเดอร์จริงบน MT5 คุม SL/TP/trailing และปิดก่อนจบแท่ง (hybrid) ตามคำสั่งที่ผ่านการอนุมัติเท่านั้น"},
+  {key:"blade", name:"BLADE-5", img:"blade.png", role:"XAU M5 · 5 กลยุทธ์ในตัวเดียว", color:"#ff6b6b",
+   jd:"บอทตัวที่ 16 — <b>BLADE คืนชีพ (7 ส.ค.)</b> หลัง bake-off 482 คอมโบ: รัน 5 กลยุทธ์ M5 อิสระพร้อมกัน magic คนละเบอร์ ถือได้ตัวละ 1 ไม้ · <b>donchian_b45</b> (net/DD 7.14 ตัวแข็งสุด) · <b>donchian_b30</b> (6.68) · <b>failed_bo</b> (5.47) · <b>engulf_b60</b> (5.57) · <b>pullback_b30</b> (2.82) · ทั้ง 5 ใช้ exit <b>no-TP + trailing</b> (ชนะ fixed-SL ทุกตัว) + time-stop 2 แท่ง · แก้ต้นเหตุ BT-live gap ของ BLADE เดิม: ประเมินครั้งเดียวตอนแท่งเปิด + lag guard 45 วิ + ไม่ backfill · <b>verify parity 0 mismatch</b> จาก 104,099 แท่ง · DEMO GUARD ล็อกบัญชีจริงไว้ · &#9888; PF เดิม 0.46 คือเวอร์ชันเก่า — ตัวนี้เริ่มนับใหม่ 7 ส.ค."},
   {key:"sage",  name:"SAGE",  img:"sage.png",  role:"Risk Manager", color:"#b06bff",
    jd:"ฝ่ายความเสี่ยง — มีสิทธิ์ VETO ไม้ที่เสี่ยง คุม equity guard, ลิมิตขาดทุนรายวัน, เลี่ยงช่วงข่าวแรง และตัดไม้ที่ R:R ไม่คุ้ม"},
   {key:"rider", name:"RIDER", img:"rider.png", role:"Trend Rider", color:"#ffb347",
@@ -289,7 +289,7 @@ const AGENTS = [
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
 ];
 
-const LIVE_BOTS=14;   // รวม ARGUS (SHADOW/DEMO) ไม่รวม BLADE ที่ปิดแล้ว
+const LIVE_BOTS=15;   // รวม ARGUS (SHADOW/DEMO) + BLADE-5 (คืนชีพ 7 ส.ค.)
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
@@ -314,7 +314,8 @@ function allTrades({includeArchived=false}={}){ return [].concat(
   (ZETRADES||[]).map(r=>({...r,bot:"ZEUS-ETH"})),
   (ATHTRADES||[]).map(r=>({...r,bot:"ATHENA"})),
   (APTRADES||[]).map(r=>({...r,bot:"APOLLO"})),
-  (ARGTRADES||[]).map(r=>({...r,bot:"ARGUS"}))); }
+  (ARGTRADES||[]).map(r=>({...r,bot:"ARGUS"})),
+  (BLTRADES||[]).map(r=>({...r,bot:"BLADE-5"}))); }
 // จำนวนไม้ที่เปิดอยู่รวมทุกบอท
 function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((RSTATUS&&RSTATUS.position)?1:0)+((HSTATUS&&HSTATUS.position)?1:0)
@@ -324,12 +325,14 @@ function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((GJSTATUS&&GJSTATUS.position)?1:0)+((ZESTATUS&&ZESTATUS.position)?1:0)
   +((ATHSTATUS&&ATHSTATUS.position)?1:0)+((APSTATUS&&APSTATUS.position)?1:0)
   +((ARGSTATUS&&ARGSTATUS.mode==="DEMO"&&ARGSTATUS.position)?1:0)
+  +bladeOpen().length
   +fxOpen(FSTATUS).length; }
 // floating รวม (fallback ตอนไม่มี status.json ระดับบัญชี)
 function floatAll(){ let f=0;
   if(STATUS&&STATUS.open_positions) f+=STATUS.open_positions.reduce((s,p)=>s+(+p.profit||0),0);
   [RSTATUS,HSTATUS,ASTATUS,KSTATUS,ELSTATUS,ZSTATUS,X1STATUS,X4STATUS,GJSTATUS,ZESTATUS,ATHSTATUS,APSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
   if(ARGSTATUS&&ARGSTATUS.mode==="DEMO"&&ARGSTATUS.position) f+=(+ARGSTATUS.position.profit||0);
+  f+=bladeOpen().reduce((s,p)=>s+(+p.floating||0),0);
   f+=fxOpen(FSTATUS).reduce((s,p)=>s+(+p.profit||0),0);
   return f; }
 
@@ -373,6 +376,11 @@ let GJSTATUS=null, GJTRADES=[], ZESTATUS=null, ZETRADES=[];   // RIDER-GJ (GBPJP
 let ATHSTATUS=null, ATHTRADES=[];                        // ATHENA (XAU M30 Inside-Bar Continuation)
 let APSTATUS=null, APTRADES=[];                          // APOLLO (XAU M30 Breakout -> Retest)
 let ARGSTATUS=null, ARGTRADES=[];                        // ARGUS (CME-AI Guarded XAU M5; DEMO trades เท่านั้น)
+let BLSTATUS=null, BLTRADES=[];                          // BLADE-5 (XAU M5 · 5 กลยุทธ์ · DEMO)
+// ไม้ที่เปิดอยู่ของ BLADE-5 (รวมทุกกลยุทธ์) -> [{id,direction,entry,floating}]
+function bladeOpen(){ if(!BLSTATUS||!BLSTATUS.strategies) return [];
+  return Object.keys(BLSTATUS.strategies).filter(k=>BLSTATUS.strategies[k].position)
+    .map(k=>({id:k,...BLSTATUS.strategies[k].position})); }
 let prevTrades=null, prevOpen=null, actx=null;
 
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -411,6 +419,12 @@ async function loadAll(){
   try{ APTRADES=parseClosedTrades(await getText("apollo_trades.csv")); }catch(e){ APTRADES=[]; }
   try{ ARGSTATUS=await getJSON("argus_cme_status.json"); }catch(e){ ARGSTATUS=null; }
   try{ ARGTRADES=parseClosedTrades(await getText("argus_cme_trades.csv")); }catch(e){ ARGTRADES=[]; }
+  try{ BLSTATUS=await getJSON("blade_multi_status.json"); }catch(e){ BLSTATUS=null; }
+  try{ const ids=["donchian_b45","donchian_b30","failed_bo","engulf_b60","pullback_b30"];
+       const rs=await Promise.all(ids.map(id=>getText("blade_"+id+"_trades.csv")
+         .then(t=>parseClosedTrades(t).map(r=>({...r,strat:id}))).catch(()=>[])));
+       BLTRADES=[].concat.apply([],rs).sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||"")); }
+  catch(e){ BLTRADES=[]; }
   try{ FSTATUS=await getJSON("fx_status.json"); }catch(e){ FSTATUS=null; }
   try{ FTRADES=parseClosedTrades(await getText("fx_trades.csv")); }catch(e){ FTRADES=[]; }
   try{ ELSTATUS=await getJSON("hunter_eth_status.json"); }catch(e){ ELSTATUS=null; }
@@ -503,7 +517,7 @@ function renderCards(){
   const hawkOn = (!STATUS || STATUS.ai_panel!==false) && lastDec!=null && lastDec<90;
   const st={
     hawk:  hawkOn?"on":(live?"idle":"off"),
-    blade: "off",   // ปิดทำการ (retired — เทสตก PF 0.46)
+    blade: (BLSTATUS&&BLSTATUS.updated&&(Date.now()-new Date(BLSTATUS.updated).getTime())<5*60000)?(bladeOpen().length?"on":"idle"):"off",
     sage:  live?"on":"off",
     auto:  live&&STATUS&&STATUS.dry_run===false?"on":(live?"idle":"off"),
     rider: (RSTATUS&&RSTATUS.updated&&(Date.now()-new Date(RSTATUS.updated).getTime())<5*60000)?(RSTATUS.position?"on":"idle"):"off",
@@ -552,7 +566,16 @@ function renderCards(){
     bits.push((m.trades||0)+" ไม้ · NET "+sign(m.net||0)+" · PF "+(m.pf==null?"—":fmt(m.pf,2)));
     _arglab=bits.join(" · ");
   }
-  const agm={ blade:"⛔ ปิดทำการ · PF 0.46", rider:_rlab, hunter:_hlab,
+  // BLADE-5: ไม้ที่ถืออยู่ (รวมทุกกลยุทธ์) / สถิติสะสม / รอสัญญาณ
+  let _bllab="";
+  const _bop=bladeOpen();
+  if(_bop.length){ const bp=_bop.reduce((s,p)=>s+(+p.floating||0),0);
+    _bllab="ถือ "+_bop.length+"/5 · "+(bp>=0?"+":"")+bp.toFixed(2)+" · "+_bop.map(p=>p.id.replace("donchian_","don")).join(","); }
+  else if(BLTRADES.length){ const bn=BLTRADES.reduce((s,r)=>s+r.profit,0);
+    const bw=BLTRADES.filter(r=>r.profit>0).length;
+    _bllab=BLTRADES.length+" ไม้ · NET "+(bn>=0?"+":"")+bn.toFixed(2)+" · WR "+Math.round(bw/BLTRADES.length*100)+"%"; }
+  else if(BLSTATUS){ _bllab="รอสัญญาณ · 5 กลยุทธ์ M5"; }
+  const agm={ blade:_bllab, rider:_rlab, hunter:_hlab,
               ares:botLab(ASTATUS,ATRADES,"รอสัญญาณ BTC M30"), kronos:botLab(KSTATUS,KTRADES,"รอสัญญาณ BTC H1"),
               hermes:_flab, helios:botLab(ELSTATUS,ELTRADES,"รอสัญญาณ ETH M30"),
               zeus:botLab(ZSTATUS,ZTRADES,"รอ squeeze breakout"),
@@ -601,6 +624,12 @@ function renderStream(){
       <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
       <span>XAUUSD · <b>ARGUS</b> @${fmt(p.entry)} <span class="open">●${shadow?'shadow':'live'}</span></span>
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
+  bladeOpen().forEach(p=>{
+    html+=`<div class="frow">
+      <span class="tm">OPEN</span>
+      <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
+      <span>XAUUSD · <b>BLADE-5</b>·${p.id} @${fmt(p.entry)} <span class="open">●live</span></span>
+      <span class="${cls(p.floating)}">${sign(p.floating)}</span></div>`; });
   // รวมไม้ปิดทุกบอท เรียงเวลา + โชว์ราคาเข้า (HERMES พก symbol ต่อไม้)
   const all=[].concat(
     RTRADES.map(r=>({...r,bot:"RIDER"})),
@@ -610,7 +639,8 @@ function renderStream(){
     X4TRADES.map(r=>({...r,bot:"HUNTER-H4"})),
     ATHTRADES.map(r=>({...r,bot:"ATHENA"})),
     APTRADES.map(r=>({...r,bot:"APOLLO"})),
-    ARGTRADES.map(r=>({...r,bot:"ARGUS"})));
+    ARGTRADES.map(r=>({...r,bot:"ARGUS"})),
+    BLTRADES.map(r=>({...r,bot:"BLADE-5·"+(r.strat||"").replace("donchian_","don")})));
   all.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   const recent=all.slice(-25).reverse();
   html+=recent.map(r=>`<div class="frow">
@@ -695,7 +725,13 @@ function renderBotStats(){
     ["HELIOS",ELTRADES,"ETH M30"],["ZEUS-ETH",ZETRADES,"ETH M30"],
     ["HERMES",FTRADES,"FX 6 คู่"],["RIDER-GJ",GJTRADES,"GBPJPY M30"],
     ["ATHENA",ATHTRADES,"XAU M30 IB"],["APOLLO",APTRADES,"XAU M30 BRT"],
-    ["ARGUS",ARGTRADES,"XAU M5 CME"]];
+    ["ARGUS",ARGTRADES,"XAU M5 CME"],
+    ["BLADE-5",BLTRADES,"XAU M5 ×5"],
+    ["  ▸ don_b45",BLTRADES.filter(r=>r.strat==="donchian_b45"),"M5"],
+    ["  ▸ don_b30",BLTRADES.filter(r=>r.strat==="donchian_b30"),"M5"],
+    ["  ▸ failed_bo",BLTRADES.filter(r=>r.strat==="failed_bo"),"M5"],
+    ["  ▸ engulf_b60",BLTRADES.filter(r=>r.strat==="engulf_b60"),"M5"],
+    ["  ▸ pullback_b30",BLTRADES.filter(r=>r.strat==="pullback_b30"),"M5"]];
   const out=rows.map(([nm,T,mk])=>{
     const n=T.length;
     if(!n) return {nm,mk,n:0,net:0,wr:0,pf:null};
