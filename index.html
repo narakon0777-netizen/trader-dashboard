@@ -291,11 +291,13 @@ const AGENTS = [
    jd:"บอทตัวที่ 15 — ผู้พิทักษ์กำแพง CME: AI เสนอ LONG/SHORT/NEUTRAL จาก Put/Call wall แต่ Guard ต้องเห็นแท่ง M5 rejection และผ่าน account, spread, exposure, R:R, risk และ idempotency ก่อนเสมอ · <b>เริ่ม SHADOW 5 วันทำการ</b> · 0.01 lot · risk ≤ $10 · BE ตรวจ bid/ask ทุก 1 วินาที · AI ไม่มีสิทธิ์ส่ง แก้ หรือปิดออเดอร์"},
   {key:"sessionorb", name:"SESSION-ORB", img:"session_orb.png", role:"XAU M5 · Opening Range Breakout", color:"#d9b45a",
    jd:"บอทตัวที่ 18 — Opening Range Breakout V0.1: สร้างกรอบจาก M5 ต่อเนื่อง 6 แท่งแรก (30 นาที) แล้วรอแท่งปิดทะลุกรอบด้วย body ≥ 0.50×ATR14 · เข้าเฉพาะต้นแท่งถัดไปภายใน 45 วินาที · SL ฝั่งตรงข้ามกรอบ · TP 1.5R · หนึ่งไม้ต่อ session · 0.01 lot · DEMO guard · ไม่มี BE/trailing/partial · ผล holdout 66 ไม้ PF 1.152 จึงยังเป็น candidate และต้องเก็บ forward เพิ่ม"},
+  {key:"lpsyproxy", name:"LPSY-PROXY", img:"lpsy_proxy_v01.png", role:"XAU M5 · Price + Tick-Volume Proxy", color:"#40e0d0",
+   jd:"บอทเก็บ EARLY DEMO SAMPLE แยกจาก GC_LPSY: ใช้ราคาและ MT5 tick volume หา range 12 แท่ง → breakout volume ≥1.2×median20 → retest ภายใน 6 แท่ง แล้วเข้าเฉพาะ 45 วินาทีแรกของแท่งถัดไป · SL หลัง retest · TP 1.5R · lot 0.01 · risk รวมต้นทุน ≤$10 · fast BE ที่ +1R ล็อกสุทธิอย่างน้อย $0.20 · daily breaker -$30/แพ้ 3 ไม้ · ยังไม่มี edge claim"},
   {key:"auto",  name:"AUTO",  img:"auto.png",  role:"Autonomous Ops", color:"#32e0e0",
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
 ];
 
-const LIVE_BOTS=18;   // รวม SESSION-ORB, ARGUS, BLADE-5, ZEUS-RETEST และ HERMOD
+const LIVE_BOTS=19;   // รวม LPSY-PROXY, SESSION-ORB, ARGUS, BLADE-5, ZEUS-RETEST และ HERMOD
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
@@ -323,6 +325,7 @@ function allTrades({includeArchived=false}={}){ return [].concat(
   (APTRADES||[]).map(r=>({...r,bot:"APOLLO"})),
   (BOSTRADES||[]).map(r=>({...r,bot:"HERMOD"})),
   (ORBTRADES||[]).map(r=>({...r,bot:"SESSION-ORB"})),
+  (LPSYTRADES||[]).map(r=>({...r,bot:"LPSY-PROXY"})),
   (ARGTRADES||[]).map(r=>({...r,bot:"ARGUS"})),
   (BLTRADES||[]).map(r=>({...r,bot:"BLADE-5"}))); }
 // จำนวนไม้ที่เปิดอยู่รวมทุกบอท
@@ -335,6 +338,7 @@ function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
   +((ATHSTATUS&&ATHSTATUS.position)?1:0)+((APSTATUS&&APSTATUS.position)?1:0)
   +((ZRSTATUS&&ZRSTATUS.position)?1:0)+((BOSSTATUS&&BOSSTATUS.position)?1:0)
   +((ORBSTATUS&&ORBSTATUS.position)?1:0)
+  +((LPSYSTATUS&&LPSYSTATUS.mode==="DEMO"&&LPSYSTATUS.position)?1:0)
   +((ARGSTATUS&&ARGSTATUS.mode==="DEMO"&&ARGSTATUS.position)?1:0)
   +bladeOpen().length
   +fxOpen(FSTATUS).length; }
@@ -342,6 +346,7 @@ function openCountAll(){ return ((STATUS&&STATUS.open_count)||0)
 function floatAll(){ let f=0;
   if(STATUS&&STATUS.open_positions) f+=STATUS.open_positions.reduce((s,p)=>s+(+p.profit||0),0);
   [RSTATUS,HSTATUS,ASTATUS,KSTATUS,ELSTATUS,ZSTATUS,ZRSTATUS,X1STATUS,X4STATUS,GJSTATUS,ZESTATUS,ATHSTATUS,APSTATUS,BOSSTATUS,ORBSTATUS].forEach(S=>{ if(S&&S.position) f+=(+S.position.profit||0); });
+  if(LPSYSTATUS&&LPSYSTATUS.mode==="DEMO"&&LPSYSTATUS.position) f+=(+LPSYSTATUS.position.profit||0);
   if(ARGSTATUS&&ARGSTATUS.mode==="DEMO"&&ARGSTATUS.position) f+=(+ARGSTATUS.position.profit||0);
   f+=bladeOpen().reduce((s,p)=>s+(+p.floating||0),0);
   f+=fxOpen(FSTATUS).reduce((s,p)=>s+(+p.profit||0),0);
@@ -373,6 +378,20 @@ function parseClosedTrades(text){
     return out;
   },[]);
 }
+// LPSY-PROXY แสดง/รวมพอร์ตเฉพาะ DEMO ที่ปิดจริง และใช้กำไรสุทธิหลัง commission/swap
+function parseLpsyDemoTrades(text){
+  const seen=new Set();
+  return parseCSV(text).reduce((out,r)=>{
+    if(r.mode!=="DEMO")return out;
+    const profit=parseFloat(r.net_profit);
+    const ticket=(r.position_id||"").trim();
+    if(!Number.isFinite(profit)||!ticket||seen.has(ticket))return out;
+    seen.add(ticket);
+    out.push({...r,profit,direction:r.side,entry_price:r.entry,exit_price:r.exit,
+      close_time:r.close_utc||r.exit_time||"",ticket});
+    return out;
+  },[]);
+}
 async function getText(n){const r=await fetch(DATA_BASE+n+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error(n);return r.text();}
 async function getJSON(n){return JSON.parse(await getText(n));}
 
@@ -391,6 +410,7 @@ let BLSTATUS=null, BLTRADES=[];                          // BLADE-5 (XAU M5 · 5
 let ZRSTATUS=null, ZRTRADES=[];                          // ZEUS-RETEST (XAU M30 limit retest)
 let BOSSTATUS=null, BOSTRADES=[];                        // HERMOD (XAU M5 BOS + retest)
 let ORBSTATUS=null, ORBTRADES=[];                        // SESSION-ORB V0.1 (XAUUSDm M5)
+let LPSYSTATUS=null, LPSYTRADES=[];                      // LPSY-PROXY V0.1 (XAUUSD M5 proxy; DEMO only in portfolio)
 // ไม้ที่เปิดอยู่ของ BLADE-5 (รวมทุกกลยุทธ์) -> [{id,direction,entry,floating}]
 function bladeOpen(){ if(!BLSTATUS||!BLSTATUS.strategies) return [];
   return Object.keys(BLSTATUS.strategies).filter(k=>BLSTATUS.strategies[k].position)
@@ -451,6 +471,8 @@ async function loadAll(){
   try{ BOSTRADES=parseClosedTrades(await getText("bos_trades.csv")); }catch(e){ BOSTRADES=[]; }
   try{ ORBSTATUS=await getJSON("session_orb_v01_status.json"); }catch(e){ ORBSTATUS=null; }
   try{ ORBTRADES=parseClosedTrades(await getText("session_orb_v01_trades.csv")); }catch(e){ ORBTRADES=[]; }
+  try{ LPSYSTATUS=await getJSON("lpsy_proxy_exec_v01_status.json"); }catch(e){ LPSYSTATUS=null; }
+  try{ LPSYTRADES=parseLpsyDemoTrades(await getText("lpsy_proxy_exec_v01_trades.csv")); }catch(e){ LPSYTRADES=[]; }
   try{ PLAYBOOK=await getText("playbook.md"); }catch(e){ PLAYBOOK=""; }
   try{ REPORT=await getText("review_report.md"); }catch(e){ REPORT=""; }
 
@@ -557,6 +579,7 @@ function renderCards(){
     argus:(ARGSTATUS&&ARGSTATUS.updated&&(Date.now()-new Date(ARGSTATUS.updated).getTime())<5*60000)?(ARGSTATUS.position?"on":"idle"):"off",
     hermod:(BOSSTATUS&&BOSSTATUS.updated&&(Date.now()-new Date(BOSSTATUS.updated).getTime())<5*60000)?(BOSSTATUS.position?"on":"idle"):"off",
     sessionorb:(ORBSTATUS&&ORBSTATUS.updated&&(Date.now()-new Date(ORBSTATUS.updated).getTime())<5*60000)?(ORBSTATUS.position?"on":"idle"):"off",
+    lpsyproxy:(LPSYSTATUS&&LPSYSTATUS.running&&LPSYSTATUS.updated&&(Date.now()-new Date(LPSYSTATUS.updated).getTime())<5*60000)?(LPSYSTATUS.position?"on":"idle"):"off",
   };
   // สถานะใต้การ์ด RIDER: ไม้ที่ถือ / สถิติสะสม / รอ breakout
   let _rlab="";
@@ -589,6 +612,17 @@ function renderCards(){
     bits.push((m.trades||0)+" ไม้ · NET "+sign(m.net||0)+" · PF "+(m.pf==null?"—":fmt(m.pf,2)));
     _arglab=bits.join(" · ");
   }
+  let _lpsylab="";
+  if(LPSYSTATUS){
+    const m=LPSYSTATUS.metrics||{}, g=LPSYSTATUS.guard||{}, bits=[LPSYSTATUS.mode||"-"];
+    bits.push(LPSYSTATUS.running?"RUNNING":"STOPPED");
+    if(LPSYSTATUS.pending) bits.push("รอ retest "+(LPSYSTATUS.pending.side||""));
+    if(LPSYSTATUS.position) bits.push((LPSYSTATUS.mode==="DEMO"?"ถือจริง ":"SIM ")+(LPSYSTATUS.position.direction||LPSYSTATUS.position.side||""));
+    if(g.verdict) bits.push(g.verdict);
+    bits.push((m.trades||0)+" ไม้ · NET "+sign(m.net||0)+" · PF "+(m.pf==null?"—":fmt(m.pf,2)));
+    bits.push("EARLY SAMPLE");
+    _lpsylab=bits.join(" · ");
+  }
   // BLADE-5: ไม้ที่ถืออยู่ (รวมทุกกลยุทธ์) / สถิติสะสม / รอสัญญาณ
   let _bllab="";
   const _bop=bladeOpen();
@@ -611,6 +645,7 @@ function renderCards(){
               apollo:botLab(APSTATUS,APTRADES,"รอ breakout → retest ทอง M30"),
               hermod:botLab(BOSSTATUS,BOSTRADES,"รอ BOS → retest ทอง M5"),
               sessionorb:botLab(ORBSTATUS,ORBTRADES,"รอ opening range breakout"),
+              lpsyproxy:_lpsylab,
               argus:_arglab };
   const wrap=$("cards");
   const flipped={};
@@ -650,6 +685,12 @@ function renderStream(){
       <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
       <span>XAUUSD · <b>ARGUS</b> @${fmt(p.entry)} <span class="open">●${shadow?'shadow':'live'}</span></span>
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
+  if(LPSYSTATUS&&LPSYSTATUS.position){ const p=LPSYSTATUS.position, sim=LPSYSTATUS.mode!=="DEMO";
+    html+=`<div class="frow">
+      <span class="tm">${sim?'SIM':'OPEN'}</span>
+      <span class="tag ${(p.direction||p.side)==='BUY'||p.side==='LONG'?'t-buy':'t-sell'}">${p.direction||p.side}</span>
+      <span>XAUUSD · <b>LPSY-PROXY</b> @${fmt(p.entry)} <span class="open">●${sim?'dry-run':'live'}</span></span>
+      <span class="${cls(p.profit||0)}">${sim?'—':sign(p.profit||0)}</span></div>`; }
   bladeOpen().forEach(p=>{
     html+=`<div class="frow">
       <span class="tm">OPEN</span>
@@ -668,6 +709,7 @@ function renderStream(){
     APTRADES.map(r=>({...r,bot:"APOLLO"})),
     BOSTRADES.map(r=>({...r,bot:"HERMOD"})),
     ORBTRADES.map(r=>({...r,bot:"SESSION-ORB"})),
+    LPSYTRADES.map(r=>({...r,bot:"LPSY-PROXY"})),
     ARGTRADES.map(r=>({...r,bot:"ARGUS"})),
     BLTRADES.map(r=>({...r,bot:"BLADE-5·"+(r.strat||"").replace("donchian_","don")})));
   all.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
@@ -751,6 +793,7 @@ function renderBotStats(){
     ["RIDER",RTRADES,"XAU H1"],["HUNTER",HTRADES,"XAU M30"],["ZEUS",ZTRADES,"XAU M30"],
     ["ZEUS-RETEST",ZRTRADES,"XAU M30 retest"],["HERMOD",BOSTRADES,"XAU M5 BOS"],
     ["SESSION-ORB",ORBTRADES,"XAU M5 ORB"],
+    ["LPSY-PROXY",LPSYTRADES,"XAU M5 proxy"],
     ["HUNTER-H1",X1TRADES,"XAU H1"],["HUNTER-H4",X4TRADES,"XAU H4"],
     ["ARES",ATRADES,"BTC M30"],["KRONOS",KTRADES,"BTC H1"],
     ["HELIOS",ELTRADES,"ETH M30"],["ZEUS-ETH",ZETRADES,"ETH M30"],
