@@ -293,7 +293,7 @@ const AGENTS = [
    jd:"บอทตัวที่ 18 — Opening Range Breakout V0.1: สร้างกรอบจาก M5 ต่อเนื่อง 6 แท่งแรก (30 นาที) แล้วรอแท่งปิดทะลุกรอบด้วย body ≥ 0.50×ATR14 · เข้าเฉพาะต้นแท่งถัดไปภายใน 45 วินาที · SL ฝั่งตรงข้ามกรอบ · TP 1.5R · หนึ่งไม้ต่อ session · 0.01 lot · DEMO guard · ไม่มี BE/trailing/partial · ผล holdout 66 ไม้ PF 1.152 จึงยังเป็น candidate และต้องเก็บ forward เพิ่ม"},
   {key:"lpsyproxy", name:"LPSY-PROXY", img:"lpsy_proxy_v01.png", role:"XAU M5 · Price + Tick-Volume Proxy", color:"#40e0d0",
    jd:"บอทเก็บ EARLY DEMO SAMPLE แยกจาก GC_LPSY: ใช้ราคาและ MT5 tick volume หา range 12 แท่ง → breakout volume ≥1.2×median20 → retest ภายใน 6 แท่ง แล้วเข้าเฉพาะ 45 วินาทีแรกของแท่งถัดไป · SL หลัง retest · TP 1.5R · lot 0.01 · risk รวมต้นทุน ≤$10 · fast BE ที่ +1R ล็อกสุทธิอย่างน้อย $0.20 · daily breaker -$30/แพ้ 3 ไม้ · ยังไม่มี edge claim"},
-  {key:"onlysig", name:"ONLYSIG-TDM", img:"auto.png", role:"XAU H4 Bias · H1 FVG + PA", color:"#f5c56b",
+  {key:"onlysig", name:"ONLYSIG-TDM", img:"onlysig_tdm_v01.png", role:"XAU H4 Bias · H1 FVG + PA", color:"#f5c56b",
    jd:"บอทเก็บ EARLY DEMO SAMPLE: ใช้ confirmed H4 structure เป็น bias → H1 FVG ตามทิศ + Engulfing/Rising/Falling Three → เข้าเฉพาะ 45 วินาทีแรกของแท่ง H1 ใหม่ · SL หลัง zone/5-bar extreme · ไม่มี TP · fast BE +1R, H1 2ATR trail และออกเมื่อ H4 reversal · lot 0.01 · risk ≤$35 · daily breaker -$70/แพ้ 2 ไม้ · train/validation PF ต่ำกว่า 1 จึงยังไม่มี edge claimและห้ามใช้เงินจริง"},
   {key:"auto",  name:"AUTO",  img:"auto.png",  role:"Autonomous Ops", color:"#32e0e0",
    jd:"ระบบอัตโนมัติเบื้องหลัง — Scout ดึงข่าว+CME, Reviewer จูนค่า &amp; เขียนบทเรียนเข้า playbook ทุกคืน, ORACLE คลังความรู้ป้อน HAWK"},
