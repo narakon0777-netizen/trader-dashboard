@@ -468,7 +468,8 @@ async function loadAll(){
   try{ ZESTATUS=await getJSON("w3_eth_status.json"); }catch(e){ ZESTATUS=null; }
   try{ ZETRADES=parseClosedTrades(await getText("w3_eth_trades.csv")); }catch(e){ ZETRADES=[]; }
   try{ ATHSTATUS=await getJSON("athena_xau_m30_status.json"); }catch(e){ ATHSTATUS=null; }
-  try{ ATHTRADES=parseClosedTrades(await getText("athena_xau_m30_trades.csv")); }catch(e){ ATHTRADES=[]; }
+  // Exit V2 เริ่ม sample ใหม่หลังเพิ่ม catastrophic MFE floor; ห้ามปน V1
+  try{ ATHTRADES=parseClosedTrades(await getText("athena_xau_m30_v2_trades.csv")); }catch(e){ ATHTRADES=[]; }
   try{ APSTATUS=await getJSON("apollo_status.json"); }catch(e){ APSTATUS=null; }
   try{ APTRADES=parseClosedTrades(await getText("apollo_trades.csv")); }catch(e){ APTRADES=[]; }
   try{ ARGSTATUS=await getJSON("argus_cme_status.json"); }catch(e){ ARGSTATUS=null; }
