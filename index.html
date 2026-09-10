@@ -278,7 +278,7 @@ const AGENTS = [
   {key:"xauh4", name:"HUNTER-H4", img:"hunter_xau_h4.png", role:"XAU H4 Reversal", color:"#c98f00",
    jd:"บอทตัวที่ 10 — HUNTER สายทองภาพใหญ่: OB + Sweep บน H4 ทองคำ ~15 ไม้/เดือน ไม้ใหญ่สุดในทีม · backtest ต้นทุนจริง PF 1.79 (IS 2.04/OOS 1.48) · &#9888; SL สูงสุด $90/ไม้ = ตัวเสี่ยงสุดต่อไม้"},
   {key:"ridergj", name:"RIDER-GJ V2", img:"rider_gbpjpy.png", role:"GBPJPY M30 · Scale-out", color:"#ff8fa3",
-   jd:"RIDER-GJ V2 — Donchian48 close-confirmed บน M30 · lot 0.10 · SL/trail 4&times;ATR14 + fast BE · เมื่อกำไรลอย gross แตะ $30 ปิด 0.05 lot แล้วล็อก runner 0.05 ที่ gross $7 · TP2 ระยะเดิม 0.8381 · เริ่ม sample ใหม่แยก V1 วันที่ 10 ก.ย. 2026"},
+   jd:"RIDER-GJ V2 — Donchian48 close-confirmed บน M30 · lot 0.10 · SL/trail 4&times;ATR14 + fast BE · เมื่อกำไรลอย gross แตะ $30 ปิด 0.05 lot แล้วล็อก runner 0.05 ที่ gross $7 · TP2 ระยะเดิม 0.8381 · มี V1 shadow 0.01 lot paper-only รันคู่เพื่อเทียบ exit โดยไม่เพิ่ม exposure"},
   {key:"zeuseth", name:"ZEUS-ETH", img:"w3_eth.png", role:"W3 Squeeze ETH", color:"#8b5cf6",
    jd:"บอทตัวที่ 12 — สายฟ้าคริปโต: W3 Squeeze breakout บน ETHUSD M30 กลไกเดียวกับ ZEUS ทอง · backtest 3.5 ปี ต้นทุนจริง PF 2.91 WR 92% (IS 2.93/OOS 2.72) ดีกว่า HUNTER บน ETH ที่ HELIOS ใช้ (1.61) · รันคู่ HELIOS"},
   {key:"athena", name:"ATHENA", img:"athena.png", role:"M30 · Inside-Bar Continuation · H1 Trend", color:"#4bc0c8",
@@ -300,7 +300,7 @@ const AGENTS = [
 ];
 
 const LIVE_BOTS=15;   // execution/demo strategies ที่เปิดตาม manifest; ไม่นับ ARGUS paused, retired, manager และ shadow
-const ACTIVE_SHADOWS=7;
+const ACTIVE_SHADOWS=8;
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
@@ -415,7 +415,7 @@ let ELSTATUS=null, ELTRADES=[];                          // HELIOS (ETH M30)
 let ZSTATUS=null, ZTRADES=[];                            // ZEUS (W3 Squeeze XAU)
 let X1STATUS=null, X1TRADES=[], X4STATUS=null, X4TRADES=[];   // HUNTER-XAU-H1 / H4
 let EPRICES=null;                                        // ราคา ETH M30 (HELIOS เขียน eth_prices.json)
-let GJSTATUS=null, GJTRADES=[], ZESTATUS=null, ZETRADES=[];   // RIDER-GJ (GBPJPY) · ZEUS-ETH
+let GJSTATUS=null, GJTRADES=[], GJV1SHSTATUS=null, GJV1SHTRADES=[], ZESTATUS=null, ZETRADES=[];   // RIDER-GJ V2 + V1 shadow · ZEUS-ETH
 let ATHSTATUS=null, ATHTRADES=[];                        // ATHENA (XAU M30 Inside-Bar Continuation)
 let APSTATUS=null, APTRADES=[];                          // APOLLO (XAU M30 Breakout -> Retest)
 let ARGSTATUS=null, ARGTRADES=[];                        // ARGUS (CME-AI Guarded XAU M5; DEMO trades เท่านั้น)
@@ -459,6 +459,8 @@ async function loadAll(){
   try{ X4TRADES=parseClosedTrades(await getText("hunter_xau_h4_trades.csv")); }catch(e){ X4TRADES=[]; }
   try{ GJSTATUS=await getJSON("rider_gbpjpy_v2_status.json"); }catch(e){ GJSTATUS=null; }
   try{ GJTRADES=parseClosedTrades(await getText("rider_gbpjpy_v2_trades.csv")); }catch(e){ GJTRADES=[]; }
+  try{ GJV1SHSTATUS=await getJSON("rider_gbpjpy_v1_compare_shadow_status.json"); }catch(e){ GJV1SHSTATUS=null; }
+  try{ GJV1SHTRADES=parseClosedTrades(await getText("rider_gbpjpy_v1_compare_shadow_trades.csv")); }catch(e){ GJV1SHTRADES=[]; }
   try{ ZESTATUS=await getJSON("w3_eth_status.json"); }catch(e){ ZESTATUS=null; }
   try{ ZETRADES=parseClosedTrades(await getText("w3_eth_trades.csv")); }catch(e){ ZETRADES=[]; }
   try{ ATHSTATUS=await getJSON("athena_xau_m30_status.json"); }catch(e){ ATHSTATUS=null; }
@@ -615,6 +617,12 @@ function renderCards(){
     if(T&&T.length){ const n=T.reduce((s,r)=>s+r.profit,0); return T.length+" ไม้ · NET "+(n>=0?"+":"")+n.toFixed(2); }
     return S?wait:"";
   };
+  let _gjlab=botLab(GJSTATUS,GJTRADES,"V2 รอ breakout GBPJPY");
+  if(GJV1SHSTATUS){
+    const sm=GJV1SHSTATUS.metrics||{}, sp=GJV1SHSTATUS.position;
+    _gjlab+=(_gjlab?" · ":"")+"V1 shadow "+(sp?("ถือ "+(sp.direction||"")):
+      ((sm.trades||0)+" ไม้ · NET "+sign(sm.net||0)));
+  }
   // ป้ายใต้การ์ด HERMES (multi-symbol: รวม float ไม้ที่เปิด / สถิติสะสม / รอสัญญาณ)
   let _flab="";
   const _fop=fxOpen(FSTATUS);
@@ -660,7 +668,7 @@ function renderCards(){
               zeusretest:botLab(ZRSTATUS,ZRTRADES,"รอ breakout → limit retest"),
               xauh1:botLab(X1STATUS,X1TRADES,"รอสัญญาณ ทอง H1"),
               xauh4:botLab(X4STATUS,X4TRADES,"รอสัญญาณ ทอง H4"),
-              ridergj:botLab(GJSTATUS,GJTRADES,"V2 รอ breakout GBPJPY"),
+              ridergj:_gjlab,
               zeuseth:botLab(ZESTATUS,ZETRADES,"รอ squeeze ETH"),
               athena:botLab(ATHSTATUS,ATHTRADES,"รอ inside-bar ทอง M30"),
               apollo:botLab(APSTATUS,APTRADES,"รอ breakout → retest ทอง M30"),
@@ -834,6 +842,7 @@ function renderBotStats(){
     ["ARES",ATRADES,"BTC M30"],["KRONOS",KTRADES,"BTC H1"],
     ["HELIOS",ELTRADES,"ETH M30"],["ZEUS-ETH",ZETRADES,"ETH M30"],
     ["HERMES",FTRADES,"FX 6 คู่"],["RIDER-GJ V2",GJTRADES,"GBPJPY M30 partial"],
+    ["RIDER-GJ V1 SH",GJV1SHTRADES,"GBPJPY M30 paper"],
     ["ATHENA",ATHTRADES,"XAU M30 IB"],["APOLLO",APTRADES,"XAU M30 BRT"],
     ["ARGUS",ARGTRADES,"XAU M5 CME"],
     ["BLADE-5",BLTRADES,"XAU M5 ×5"],
