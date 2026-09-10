@@ -277,8 +277,8 @@ const AGENTS = [
    jd:"บอทตัวที่ 9 — HUNTER สายทองเกมยาว: OB + Sweep กลับตัวบน H1 ทองคำ กลไกเดียวกับ HUNTER M30 ต่างแค่ TF + สเกล exit (&times;1.45) · backtest 2.5 ปี ต้นทุนจริง PF 2.00 (IS 1.71/OOS 2.68) · ไม้ใหญ่กว่า M30 SL สูงสุด $46"},
   {key:"xauh4", name:"HUNTER-H4", img:"hunter_xau_h4.png", role:"XAU H4 Reversal", color:"#c98f00",
    jd:"บอทตัวที่ 10 — HUNTER สายทองภาพใหญ่: OB + Sweep บน H4 ทองคำ ~15 ไม้/เดือน ไม้ใหญ่สุดในทีม · backtest ต้นทุนจริง PF 1.79 (IS 2.04/OOS 1.48) · &#9888; SL สูงสุด $90/ไม้ = ตัวเสี่ยงสุดต่อไม้"},
-  {key:"ridergj", name:"RIDER-GJ", img:"rider_gbpjpy.png", role:"GBPJPY Trend", color:"#ff8fa3",
-   jd:"บอทตัวที่ 11 — RIDER สายเงินเยน: Donchian48 breakout + trail 4&times;ATR + BE บน GBPJPY M30 กลไกเดียวกับ RIDER ทอง · backtest 3.5 ปี PF 1.55 โดย IS = OOS = 1.55 (เสถียรผิดปกติ = สัญญาณดี)"},
+  {key:"ridergj", name:"RIDER-GJ V2", img:"rider_gbpjpy.png", role:"GBPJPY M30 · Scale-out", color:"#ff8fa3",
+   jd:"RIDER-GJ V2 — Donchian48 close-confirmed บน M30 · lot 0.10 · SL/trail 4&times;ATR14 + fast BE · เมื่อกำไรลอย gross แตะ $30 ปิด 0.05 lot แล้วล็อก runner 0.05 ที่ gross $7 · TP2 ระยะเดิม 0.8381 · เริ่ม sample ใหม่แยก V1 วันที่ 10 ก.ย. 2026"},
   {key:"zeuseth", name:"ZEUS-ETH", img:"w3_eth.png", role:"W3 Squeeze ETH", color:"#8b5cf6",
    jd:"บอทตัวที่ 12 — สายฟ้าคริปโต: W3 Squeeze breakout บน ETHUSD M30 กลไกเดียวกับ ZEUS ทอง · backtest 3.5 ปี ต้นทุนจริง PF 2.91 WR 92% (IS 2.93/OOS 2.72) ดีกว่า HUNTER บน ETH ที่ HELIOS ใช้ (1.61) · รันคู่ HELIOS"},
   {key:"athena", name:"ATHENA", img:"athena.png", role:"M30 · Inside-Bar Continuation · H1 Trend", color:"#4bc0c8",
@@ -300,7 +300,7 @@ const AGENTS = [
 ];
 
 const LIVE_BOTS=15;   // execution/demo strategies ที่เปิดตาม manifest; ไม่นับ ARGUS paused, retired, manager และ shadow
-const ACTIVE_SHADOWS=5;
+const ACTIVE_SHADOWS=7;
 const $=id=>document.getElementById(id);
 const fmt=(n,d=2)=>(n==null||isNaN(n))?"—":Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls=n=>n>0?"pos":n<0?"neg":"neu";
@@ -320,7 +320,7 @@ function allTrades({includeArchived=false}={}){ return [].concat(
   (ELTRADES||[]).map(r=>({...r,bot:"HELIOS"})),
   (ZRTRADES||[]).map(r=>({...r,bot:"ZEUS-RETEST"})),
   (X4TRADES||[]).map(r=>({...r,bot:"HUNTER-H4"})),
-  (GJTRADES||[]).map(r=>({...r,bot:"RIDER-GJ"})),
+  (GJTRADES||[]).map(r=>({...r,bot:"RIDER-GJ V2"})),
   (ZETRADES||[]).map(r=>({...r,bot:"ZEUS-ETH"})),
   (ATHTRADES||[]).map(r=>({...r,bot:"ATHENA"})),
   (APTRADES||[]).map(r=>({...r,bot:"APOLLO"})),
@@ -457,8 +457,8 @@ async function loadAll(){
   try{ X1TRADES=parseClosedTrades(await getText("hunter_xau_h1_trades.csv")); }catch(e){ X1TRADES=[]; }
   try{ X4STATUS=await getJSON("hunter_xau_h4_status.json"); }catch(e){ X4STATUS=null; }
   try{ X4TRADES=parseClosedTrades(await getText("hunter_xau_h4_trades.csv")); }catch(e){ X4TRADES=[]; }
-  try{ GJSTATUS=await getJSON("rider_gbpjpy_status.json"); }catch(e){ GJSTATUS=null; }
-  try{ GJTRADES=parseClosedTrades(await getText("rider_gbpjpy_trades.csv")); }catch(e){ GJTRADES=[]; }
+  try{ GJSTATUS=await getJSON("rider_gbpjpy_v2_status.json"); }catch(e){ GJSTATUS=null; }
+  try{ GJTRADES=parseClosedTrades(await getText("rider_gbpjpy_v2_trades.csv")); }catch(e){ GJTRADES=[]; }
   try{ ZESTATUS=await getJSON("w3_eth_status.json"); }catch(e){ ZESTATUS=null; }
   try{ ZETRADES=parseClosedTrades(await getText("w3_eth_trades.csv")); }catch(e){ ZETRADES=[]; }
   try{ ATHSTATUS=await getJSON("athena_xau_m30_status.json"); }catch(e){ ATHSTATUS=null; }
@@ -660,7 +660,7 @@ function renderCards(){
               zeusretest:botLab(ZRSTATUS,ZRTRADES,"รอ breakout → limit retest"),
               xauh1:botLab(X1STATUS,X1TRADES,"รอสัญญาณ ทอง H1"),
               xauh4:botLab(X4STATUS,X4TRADES,"รอสัญญาณ ทอง H4"),
-              ridergj:botLab(GJSTATUS,GJTRADES,"รอ breakout GBPJPY"),
+              ridergj:botLab(GJSTATUS,GJTRADES,"V2 รอ breakout GBPJPY"),
               zeuseth:botLab(ZESTATUS,ZETRADES,"รอ squeeze ETH"),
               athena:botLab(ATHSTATUS,ATHTRADES,"รอ inside-bar ทอง M30"),
               apollo:botLab(APSTATUS,APTRADES,"รอ breakout → retest ทอง M30"),
@@ -789,10 +789,10 @@ function renderStream(){
     fhtml+=`<div class="frow">
       <span class="tm">OPEN</span>
       <span class="tag ${p.direction==='BUY'?'t-buy':'t-sell'}">${p.direction}</span>
-      <span>GBPJPY · <b>RIDER-GJ</b> @${fmt(p.entry,3)} <span class="open">●live</span></span>
+      <span>GBPJPY · <b>RIDER-GJ V2</b> ${fmt(p.volume,2)} lot @${fmt(p.entry,3)} · ${esc(p.tp1_phase||'PENDING')} <span class="open">●live</span></span>
       <span class="${cls(p.profit)}">${sign(p.profit)}</span></div>`; }
   const fall=[].concat(FTRADES.map(r=>({...r,bot:"HERMES"})),
-                       GJTRADES.map(r=>({...r,bot:"RIDER-GJ",symbol:"GBPJPY"})));
+                       GJTRADES.map(r=>({...r,bot:"RIDER-GJ V2",symbol:"GBPJPY"})));
   fall.sort((a,b)=>(a.close_time||"").localeCompare(b.close_time||""));
   fhtml+=fall.slice(-25).reverse().map(r=>`<div class="frow">
     <span class="tm">${(r.close_time||"").slice(5,16)}</span>
@@ -833,7 +833,7 @@ function renderBotStats(){
     ["HUNTER-H1",X1TRADES,"XAU H1"],["HUNTER-H4",X4TRADES,"XAU H4"],
     ["ARES",ATRADES,"BTC M30"],["KRONOS",KTRADES,"BTC H1"],
     ["HELIOS",ELTRADES,"ETH M30"],["ZEUS-ETH",ZETRADES,"ETH M30"],
-    ["HERMES",FTRADES,"FX 6 คู่"],["RIDER-GJ",GJTRADES,"GBPJPY M30"],
+    ["HERMES",FTRADES,"FX 6 คู่"],["RIDER-GJ V2",GJTRADES,"GBPJPY M30 partial"],
     ["ATHENA",ATHTRADES,"XAU M30 IB"],["APOLLO",APTRADES,"XAU M30 BRT"],
     ["ARGUS",ARGTRADES,"XAU M5 CME"],
     ["BLADE-5",BLTRADES,"XAU M5 ×5"],
